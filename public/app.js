@@ -56,19 +56,20 @@ async function sendCampaign() {
     opIdEl.textContent = data.operationId || '—';
     currentOperationId = data.operationId;
     rawRes.textContent = JSON.stringify(data, null, 2);
-    // Optimistically reflect the submitted count so the Total tile updates instantly.
-    // pollOnce will overwrite this with authoritative Operations stats within ~750ms.
-    if (currentOperationId && data.recipientCount != null) {
+    // Always seed the operation in sessionOperations so pollAll picks it up,
+    // even if the server didn't return a recipientCount. When recipientCount is
+    // present, prime `total` optimistically so the tile updates instantly.
+    if (currentOperationId) {
       sessionOperations[currentOperationId] = {
-        total: data.recipientCount,
+        total: data.recipientCount != null ? data.recipientCount : 0,
         delivered: 0,
         failed: 0,
         unaddressable: 0,
         status: 'SUBMITTED',
       };
       updateSessionTotals();
+      startPolling();
     }
-    if (currentOperationId) startPolling();
   } catch (err) {
     rawRes.textContent = `ERROR: ${err.message}`;
   } finally {
