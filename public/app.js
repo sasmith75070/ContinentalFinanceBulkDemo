@@ -78,31 +78,39 @@ async function sendCampaign() {
 
 function startPolling() {
   if (pollTimer) clearInterval(pollTimer);
-  pollOnce();
-  pollTimer = setInterval(pollOnce, 750);
+  pollAll();
+  pollTimer = setInterval(pollAll, 750);
 }
 
-async function pollOnce() {
-  if (!currentOperationId) return;
+async function pollAll() {
+  const pending = Object.entries(sessionOperations).filter(
+    ([, op]) => op.status !== 'COMPLETED' && op.status !== 'FAILED'
+  );
+  if (pending.length === 0) {
+    clearInterval(pollTimer);
+    pollTimer = null;
+    return;
+  }
+  await Promise.all(pending.map(([opId]) => pollSingle(opId)));
+  updateSessionTotals();
+}
+
+async function pollSingle(opId) {
   try {
-    const res = await fetch(`/api/operations/${encodeURIComponent(currentOperationId)}`);
+    const res = await fetch(`/api/operations/${encodeURIComponent(opId)}`);
     if (!res.ok) return;
     const data = await res.json();
     const s = data.stats || {};
-    // Keep `total` monotonic — protects the optimistic submit value from being
-    // clobbered by an early poll where Twilio hasn't populated stats yet.
-    const prev = sessionOperations[currentOperationId] || {};
-    sessionOperations[currentOperationId] = {
+    // All four counters are monotonic across an operation's lifecycle, so Math.max
+    // protects against transient empty-stats responses clobbering earlier values.
+    const prev = sessionOperations[opId] || {};
+    sessionOperations[opId] = {
       total: Math.max(prev.total || 0, s.total || 0),
-      delivered: s.delivered || 0,
-      failed: s.failed || 0,
-      unaddressable: s.unaddressable || 0,
+      delivered: Math.max(prev.delivered || 0, s.delivered || 0),
+      failed: Math.max(prev.failed || 0, s.failed || 0),
+      unaddressable: Math.max(prev.unaddressable || 0, s.unaddressable || 0),
       status: data.status,
     };
-    updateSessionTotals();
-    if (data.status === 'COMPLETED' || data.status === 'FAILED') {
-      clearInterval(pollTimer);
-    }
   } catch (err) {
     // ignore transient poll errors
   }
