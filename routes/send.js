@@ -6,8 +6,10 @@ const { publish } = require('./stream');
 
 const router = Router();
 
+// Bulk Messaging requires the `default` Liquid filter on every variable occurrence.
+// Use SINGLE QUOTES inside the filter — Twilio's Liquid parser rejects JSON-escaped double quotes.
 const REMINDER_TEMPLATE =
-  'Hi {{firstName}}, this is a reminder that your Surge Mastercard ending in {{lastFour}} has a payment of {{amountDue}} due on {{dueDate}}. Reply STOP to opt out.';
+  "Hi {{firstName | default: 'Customer'}}, this is a reminder that your Surge Mastercard ending in {{lastFour | default: '0000'}} has a payment of {{amountDue | default: 'your balance'}} due on {{dueDate | default: 'soon'}}. Reply STOP to opt out.";
 
 router.post('/api/campaigns/send', async (req, res) => {
   try {
