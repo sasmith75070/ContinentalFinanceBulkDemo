@@ -50,6 +50,7 @@ router.post('/api/campaigns/send', async (req, res) => {
       campaignId,
       operationId: result.operationId,
       status: result.status,
+      recipientCount: recipients.length,
       request: body,
       response: { status: result.status, body: result.body, headers: result.headers },
     });
@@ -58,6 +59,7 @@ router.post('/api/campaigns/send', async (req, res) => {
       campaignId,
       operationId: result.operationId,
       status: result.status,
+      recipientCount: recipients.length,
       response: result.body,
     });
   } catch (err) {

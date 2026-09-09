@@ -56,6 +56,18 @@ async function sendCampaign() {
     opIdEl.textContent = data.operationId || '—';
     currentOperationId = data.operationId;
     rawRes.textContent = JSON.stringify(data, null, 2);
+    // Optimistically reflect the submitted count so the Total tile updates instantly.
+    // pollOnce will overwrite this with authoritative Operations stats within ~750ms.
+    if (currentOperationId && data.recipientCount != null) {
+      sessionOperations[currentOperationId] = {
+        total: data.recipientCount,
+        delivered: 0,
+        failed: 0,
+        unaddressable: 0,
+        status: 'SUBMITTED',
+      };
+      updateSessionTotals();
+    }
     if (currentOperationId) startPolling();
   } catch (err) {
     rawRes.textContent = `ERROR: ${err.message}`;
@@ -67,7 +79,7 @@ async function sendCampaign() {
 function startPolling() {
   if (pollTimer) clearInterval(pollTimer);
   pollOnce();
-  pollTimer = setInterval(pollOnce, 2000);
+  pollTimer = setInterval(pollOnce, 750);
 }
 
 async function pollOnce() {
@@ -77,8 +89,11 @@ async function pollOnce() {
     if (!res.ok) return;
     const data = await res.json();
     const s = data.stats || {};
+    // Keep `total` monotonic — protects the optimistic submit value from being
+    // clobbered by an early poll where Twilio hasn't populated stats yet.
+    const prev = sessionOperations[currentOperationId] || {};
     sessionOperations[currentOperationId] = {
-      total: s.total || 0,
+      total: Math.max(prev.total || 0, s.total || 0),
       delivered: s.delivered || 0,
       failed: s.failed || 0,
       unaddressable: s.unaddressable || 0,
