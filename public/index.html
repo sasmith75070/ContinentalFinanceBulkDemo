@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Continental Finance • Surge Mastercard SMS</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <span class="brand-mark">SURGE</span>
+      <span class="brand-sub">Mastercard SMS Operations</span>
+    </div>
+    <div class="env-status" id="env-status">Twilio Bulk Messaging Demo</div>
+  </header>
+
+  <main>
+    <section class="panel">
+      <h2>Scene A — Payment Reminder</h2>
+      <p>Send a Surge past-due reminder to the demo customer via the Twilio Bulk Messaging API.</p>
+      <button id="send-btn">Send Surge past-due reminder</button>
+      <div class="counters" id="counters">
+        <div><label>Operation</label><span id="op-id">&mdash;</span></div>
+        <div><label>HTTP</label><span id="http-status">&mdash;</span></div>
+        <div><label>Total</label><span id="stat-total">&mdash;</span></div>
+        <div><label>Delivered</label><span id="stat-delivered">&mdash;</span></div>
+        <div><label>Failed</label><span id="stat-failed">&mdash;</span></div>
+        <div><label>Unaddressable</label><span id="stat-unaddressable">&mdash;</span></div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Customer thread</h2>
+      <div id="thread" class="thread"></div>
+    </section>
+
+    <section class="panel raw">
+      <h2>Raw API</h2>
+      <div class="raw-block">
+        <h3>Request &mdash; POST https://comms.twilio.com/v1/Messages</h3>
+        <pre id="raw-request">&mdash;</pre>
+      </div>
+      <div class="raw-block">
+        <h3>Response</h3>
+        <pre id="raw-response">&mdash;</pre>
+      </div>
+    </section>
+  </main>
+
+  <script src="/app.js"></script>
+</body>
+</html>
