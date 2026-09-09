@@ -14,6 +14,24 @@ const statUnaddr = $('stat-unaddressable');
 let currentOperationId = null;
 let pollTimer = null;
 
+// Track every operation we've seen this session so we can display cumulative totals.
+// { operationId: { total, delivered, failed, unaddressable, status } }
+const sessionOperations = {};
+
+function updateSessionTotals() {
+  const totals = { total: 0, delivered: 0, failed: 0, unaddressable: 0 };
+  for (const op of Object.values(sessionOperations)) {
+    totals.total += op.total || 0;
+    totals.delivered += op.delivered || 0;
+    totals.failed += op.failed || 0;
+    totals.unaddressable += op.unaddressable || 0;
+  }
+  statTotal.textContent = totals.total;
+  statDelivered.textContent = totals.delivered;
+  statFailed.textContent = totals.failed;
+  statUnaddr.textContent = totals.unaddressable;
+}
+
 function addToThread({ direction, body }) {
   const div = document.createElement('div');
   div.className = `bubble ${direction}`;
@@ -59,10 +77,14 @@ async function pollOnce() {
     if (!res.ok) return;
     const data = await res.json();
     const s = data.stats || {};
-    statTotal.textContent = s.total ?? '—';
-    statDelivered.textContent = s.delivered ?? '—';
-    statFailed.textContent = s.failed ?? '—';
-    statUnaddr.textContent = s.unaddressable ?? '—';
+    sessionOperations[currentOperationId] = {
+      total: s.total || 0,
+      delivered: s.delivered || 0,
+      failed: s.failed || 0,
+      unaddressable: s.unaddressable || 0,
+      status: data.status,
+    };
+    updateSessionTotals();
     if (data.status === 'COMPLETED' || data.status === 'FAILED') {
       clearInterval(pollTimer);
     }
