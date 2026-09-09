@@ -13,7 +13,7 @@ app.use(streamRouter);
 app.use(sendRouter);
 app.use(operationsRouter);
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
   console.log(`Continental Finance Bulk Messaging Demo running on http://localhost:${PORT}`);
   const required = [
