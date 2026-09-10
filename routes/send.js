@@ -11,10 +11,22 @@ const router = Router();
 const REMINDER_TEMPLATE =
   "Hi {{firstName | default: 'Customer'}}, this is a reminder that your Surge Mastercard ending in {{lastFour | default: '0000'}} has a payment of {{amountDue | default: 'your balance'}} due on {{dueDate | default: 'soon'}}. Reply STOP to opt out.";
 
+// Build a "10:00 tomorrow" ISO expression WITHOUT a timezone marker so Twilio
+// auto-localizes the delivery time to each recipient's timezone (determined
+// from the address, falling back to UTC). Docs:
+// https://www.twilio.com/docs/bulk-messaging/scheduling
+function tomorrowLocal10am() {
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T10:00:00`;
+}
+
 router.post('/api/campaigns/send', async (req, res) => {
   try {
     const safeMode = process.env.SAFE_MODE === 'true';
     const dnc = new Set(db.prepare(`SELECT phone FROM dnc`).all().map((r) => r.phone));
+    const scheduleFor = req.body && req.body.scheduleFor;
 
     const recipients = [];
     if (!safeMode) {
@@ -39,10 +51,13 @@ router.post('/api/campaigns/send', async (req, res) => {
       to: recipients,
       content: { text: REMINDER_TEMPLATE },
     };
+    if (scheduleFor) {
+      body.schedule = { sendAt: [scheduleFor === 'tomorrow-10am-local' ? tomorrowLocal10am() : scheduleFor] };
+    }
 
     const info = db
       .prepare(`INSERT INTO campaigns (name, payload_json) VALUES (?, ?)`)
-      .run('surge-past-due', JSON.stringify(body));
+      .run(scheduleFor ? 'surge-past-due-scheduled' : 'surge-past-due', JSON.stringify(body));
     const campaignId = info.lastInsertRowid;
 
     const result = await sendBulk(body);
@@ -62,6 +77,8 @@ router.post('/api/campaigns/send', async (req, res) => {
       operationId: result.operationId,
       status: result.status,
       recipientCount: recipients.length,
+      scheduled: !!body.schedule,
+      sendAt: body.schedule && body.schedule.sendAt && body.schedule.sendAt[0] || null,
       request: body,
       response: { status: result.status, body: result.body, headers: result.headers },
     });
@@ -71,6 +88,8 @@ router.post('/api/campaigns/send', async (req, res) => {
       operationId: result.operationId,
       status: result.status,
       recipientCount: recipients.length,
+      scheduled: !!body.schedule,
+      sendAt: body.schedule && body.schedule.sendAt && body.schedule.sendAt[0] || null,
       response: result.body,
     });
   } catch (err) {

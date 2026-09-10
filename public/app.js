@@ -168,35 +168,50 @@ function setRaw(request, response) {
   if (response) $('raw-response').textContent = JSON.stringify(response, null, 2);
 }
 
-$('send-btn').addEventListener('click', async () => {
-  const btn = $('send-btn');
+async function fireCampaign({ scheduleFor, buttonId, scheduleLabel } = {}) {
+  const btn = $(buttonId);
   btn.disabled = true;
   advanceCoach('a', 2);
   logActivity({
     kind: 'server',
     tag: 'Server',
-    tech: 'POST /api/campaigns/send',
-    plain: 'Dashboard asks our Node/Express server to build a Bulk Messaging payload and forward it to Twilio.',
+    tech: `POST /api/campaigns/send${scheduleFor ? ' · scheduleFor=' + scheduleFor : ''}`,
+    plain: scheduleFor
+      ? `Server builds a Bulk payload with <code>schedule.sendAt</code> set to <b>${scheduleLabel}</b> and forwards to Twilio.`
+      : 'Server builds an immediate Bulk payload and forwards to Twilio.',
   });
   const started = performance.now();
   try {
-    const res = await fetch('/api/campaigns/send', { method: 'POST' });
+    const res = await fetch('/api/campaigns/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(scheduleFor ? { scheduleFor } : {}),
+    });
     const data = await res.json();
     const ms = Math.round(performance.now() - started);
     $('http-status').textContent = res.status;
     $('op-id').textContent = data.operationId || '—';
     setRaw(undefined, data);
 
+    let plain;
+    if (!res.ok) {
+      plain = `Twilio rejected the request: ${data.error || 'unknown error'}`;
+    } else if (data.scheduled) {
+      plain = `Twilio accepted a <b>scheduled</b> send for <b>${data.sendAt}</b> (no timezone → Twilio localizes to each cardholder). <b>${data.recipientCount}</b> cardholder(s). Operation <code>${data.operationId || '—'}</code>. Delivery fires at 10am <i>local</i> per cardholder — no cron on our side.`;
+    } else {
+      plain = `Twilio accepted <b>${data.recipientCount}</b> cardholder(s) for immediate delivery. Operation <code>${data.operationId || '—'}</code>. Per-recipient status will stream back via GET /Operations.`;
+    }
+
     logActivity({
       kind: 'bulk',
       tag: 'Bulk API',
       tech: 'POST https://comms.twilio.com/v1/Messages',
-      plain: res.ok
-        ? `Twilio accepted <b>${data.recipientCount}</b> recipient(s) and returned <code>operationId</code> <code>${data.operationId || '—'}</code>. Delivery status will stream back via GET /Operations.`
-        : `Twilio rejected the request: ${data.error || 'unknown error'}`,
+      plain,
       status: `${res.status} · ${ms}ms`,
       statusClass: res.ok ? 'ok' : 'err',
-      doc: { url: 'https://www.twilio.com/docs/bulk-messaging/api/message-resource', label: 'Docs · Bulk Messaging: Message resource' },
+      doc: scheduleFor
+        ? { url: 'https://www.twilio.com/docs/bulk-messaging/scheduling', label: 'Docs · Bulk Messaging: Scheduling' }
+        : { url: 'https://www.twilio.com/docs/bulk-messaging/api/message-resource', label: 'Docs · Bulk Messaging: Message resource' },
     });
 
     if (data.operationId) { primeOperation(data.operationId, data.recipientCount); advanceCoach('a', 3); }
@@ -206,7 +221,14 @@ $('send-btn').addEventListener('click', async () => {
   } finally {
     btn.disabled = false;
   }
-});
+}
+
+$('send-btn').addEventListener('click', () => fireCampaign({ buttonId: 'send-btn' }));
+$('schedule-btn').addEventListener('click', () => fireCampaign({
+  scheduleFor: 'tomorrow-10am-local',
+  scheduleLabel: '10:00 tomorrow (per-cardholder local time)',
+  buttonId: 'schedule-btn',
+}));
 
 // ────────── Scene B ──────────
 const queueTableBody = document.querySelector('#queue-table tbody');

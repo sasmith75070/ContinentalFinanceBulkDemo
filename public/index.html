@@ -88,14 +88,20 @@
       </div>
 
       <div class="action-row">
-        <button id="send-btn" class="btn primary large">
-          <span class="btn-label">Send Surge past-due reminder</span>
-          <span class="btn-endpoint">POST <code>comms.twilio.com/v1/Messages</code> · Bulk API</span>
-        </button>
+        <div class="btn-row">
+          <button id="send-btn" class="btn primary large">
+            <span class="btn-label">Send now</span>
+            <span class="btn-endpoint">POST <code>/v1/Messages</code> · immediate</span>
+          </button>
+          <button id="schedule-btn" class="btn ghost large">
+            <span class="btn-label">Schedule for 10am tomorrow (per-cardholder local)</span>
+            <span class="btn-endpoint">POST <code>/v1/Messages</code> · <code>schedule.sendAt</code></span>
+          </button>
+        </div>
         <div class="action-legend">
-          <div class="legend-item"><span class="dot green"></span> Delivered = confirmed by carrier</div>
-          <div class="legend-item"><span class="dot amber"></span> Failed = carrier rejected</div>
-          <div class="legend-item"><span class="dot muted"></span> Unaddressable = number not routable</div>
+          <div class="legend-item"><span class="dot green"></span> Delivered</div>
+          <div class="legend-item"><span class="dot amber"></span> Failed</div>
+          <div class="legend-item"><span class="dot muted"></span> Unaddressable</div>
         </div>
       </div>
 
@@ -146,6 +152,7 @@
             <li><b>Per-recipient status.</b> The Operations resource returns Delivered / Failed / Unaddressable counters that advance in real time.</li>
             <li><b>Native scheduling, up to 7 days out.</b> Pass <code>schedule.sendAt</code> in the same API call. Omit the timezone and Twilio auto-localizes each cardholder's send time — so an 8am–9pm ET window becomes 8am–9pm <i>local</i> for every cardholder, without per-zone logic in Continental Finance's scheduler.</li>
             <li><b>Compliance Toolkit note.</b> Programmable Messaging only; not exposed on Bulk. We are intentionally not claiming it here.</li>
+            <li><b>Rich content, same API.</b> Reference a Content Template by <code>contentId</code> (RCS card, MMS, WhatsApp), or pass inline RCS content. Add <code>channels.priority</code> — e.g. <code>[{RCS: 0}, {SMS: 1}]</code> — and Twilio delivers RCS where the cardholder's device supports it and automatically falls back to SMS everywhere else. One payload, richest supported format per cardholder.</li>
           </ul>
         </div>
       </div>
