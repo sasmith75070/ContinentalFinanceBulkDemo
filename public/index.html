@@ -43,11 +43,6 @@
       <span class="tab-title">Response &amp; Opt-Out</span>
       <span class="tab-sub">RFP use case 3</span>
     </button>
-    <button class="scene-tab" data-scene="d">
-      <span class="tab-num">D</span>
-      <span class="tab-title">Admin</span>
-      <span class="tab-sub">RFP use case 4 · talk-track</span>
-    </button>
   </nav>
 
   <main>
@@ -277,35 +272,6 @@
           <h3>Do-Not-Contact list (app-side)</h3>
           <p class="sub">Separate from Twilio's Advanced Opt-Out block list. Enforces cross-sender suppression the RFP asks for. Attempting to send to a DNC'd number returns error <code>21610</code>.</p>
           <div id="dnc-list" class="dnc-list"></div>
-        </div>
-      </div>
-    </section>
-
-    <!-- ────────── SCENE D ────────── -->
-    <section class="scene hidden" data-scene="d">
-      <div class="scene-head">
-        <div>
-          <div class="eyebrow">Scene D · talk-track</div>
-          <h2>Business-user self-service for campaign administration</h2>
-          <p>This scene is intentionally not interactive. It maps RFP use case 4 to Twilio Console self-service capabilities — honestly.</p>
-        </div>
-      </div>
-      <div class="two-col">
-        <div class="sub-panel">
-          <h3>Business users can self-serve for</h3>
-          <ul class="proof-list check">
-            <li><b>DNC / suppression list management</b> · Messaging &gt; Advanced Opt-Out</li>
-            <li><b>Opt-out confirmation wording</b> · custom Surge copy without redeploying code</li>
-            <li><b>Sender Pool / Messaging Service configuration</b> · add/remove numbers, rules</li>
-            <li><b>Scheduling adjustments &amp; pausing campaigns</b> · Bulk scheduling up to 7 days out</li>
-            <li><b>Delivery monitoring, alerts, reports</b> · Console + Insights + Event Streams</li>
-          </ul>
-        </div>
-        <div class="sub-panel warn">
-          <h3>Where we concede honestly</h3>
-          <p><b>Changing the SMS body copy itself still requires an application code change.</b> Twilio does not ship a business-user editor for SMS body text.</p>
-          <p>If Continental Finance wants a business-user-facing content editor on top of Bulk Messaging, that is a scoped services engagement — separately quoted. We won't fake it in this demo.</p>
-          <p class="sub">For everything except message body copy, Console + IAM roles cover it.</p>
         </div>
       </div>
     </section>

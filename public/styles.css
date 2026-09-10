@@ -96,7 +96,7 @@ code { font-family: 'SF Mono', Menlo, Monaco, 'Cascadia Code', monospace; font-s
 /* ---------- Scene tabs ---------- */
 .scenes {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 10px;
   padding: 18px 28px 0;
 }
