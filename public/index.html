@@ -157,8 +157,8 @@
       <div class="scene-head">
         <div>
           <div class="eyebrow">Scene B</div>
-          <h2>Suppress reminders the instant a payment posts</h2>
-          <p>Continental Finance's current lag from payment to suppression is ~15 minutes. With a real-time payment-posted webhook, that lag becomes <b>zero</b>.</p>
+          <h2>Cancel a scheduled SMS before it sends</h2>
+          <p>If Continental Finance schedules a reminder and then the cardholder pays before it fires, they can cancel that SMS with one API call — as long as the message is still in <code>scheduled</code> status (up to about 15 minutes before the scheduled send time).</p>
         </div>
       </div>
 
@@ -166,54 +166,70 @@
         <div class="coach-step" data-step="1">
           <div class="coach-num">1</div>
           <div class="coach-text">
-            <b>A cardholder pays their bill</b>
-            <span>Click any row's "Payment posted" button. Continental Finance's payment system fires a webhook to our server.</span>
+            <b>Schedule Jane's reminder (20 min out)</b>
+            <span>Server calls <b>POST <code>/2010-04-01/Accounts/{Sid}/Messages.json</code></b> with <code>scheduleType=fixed</code>, <code>sendAt</code>, and the Messaging Service SID. Twilio returns a <b>MessageSid</b> and <b>status=<code>scheduled</code></b>.</span>
           </div>
         </div>
         <div class="coach-arrow">→</div>
         <div class="coach-step" data-step="2">
           <div class="coach-num">2</div>
           <div class="coach-text">
-            <b>That cardholder is suppressed</b>
-            <span>Server removes them from today's queue. The list is re-read at the moment of send — not at scheduling time.</span>
+            <b>Payment posts → cancel via Update Message</b>
+            <span>Continental Finance's payment system POSTs to <code>/webhooks/payment</code>. Our server looks up Jane's MessageSid, then calls <b>POST <code>/Messages/{MessageSid}.json</code></b> with <code>Status=canceled</code>. Twilio flips the status.</span>
           </div>
         </div>
         <div class="coach-arrow">→</div>
         <div class="coach-step" data-step="3">
           <div class="coach-num">3</div>
           <div class="coach-text">
-            <b>Send today's 10am reminder</b>
-            <span>Bulk API fires with only pending cardholders. The paid cardholder gets no message.</span>
+            <b>Twilio Console confirms</b>
+            <span>Console → Monitor → Logs → Messaging → find the MessageSid. Status = <b><code>canceled</code></b>. No SMS was ever sent to the cardholder.</span>
           </div>
         </div>
       </div>
 
+      <div class="flow-note">
+        <b>Cancellation window:</b> Cancel only works while the message is in <code>scheduled</code> status. Twilio moves scheduled messages into <code>queued</code> roughly 15 minutes before <code>sendAt</code>. After that, cancellation returns error <a href="https://www.twilio.com/docs/api/errors/30409" target="_blank">30409</a>. Design Continental Finance's schedule lead time with this window in mind.
+      </div>
+
       <div class="action-row">
-        <button id="queue-reset" class="btn ghost">
-          <span class="btn-label">Reset queue</span>
-          <span class="btn-endpoint">POST <code>/api/queue/reset</code> · local</span>
-        </button>
-        <button id="queue-send" class="btn primary large">
-          <span class="btn-label">Send today's 10am reminder</span>
-          <span class="btn-endpoint">POST <code>comms.twilio.com/v1/Messages</code> · Bulk API</span>
-        </button>
+        <div class="btn-row">
+          <button id="queue-reset" class="btn ghost">
+            <span class="btn-label">Reset queue</span>
+            <span class="btn-endpoint">POST <code>/api/queue/reset</code> · local</span>
+          </button>
+          <button id="queue-schedule" class="btn primary large">
+            <span class="btn-label">Schedule Jane's reminder (20 min from now)</span>
+            <span class="btn-endpoint">POST <code>/2010-04-01/…/Messages.json</code> · <code>scheduleType=fixed</code></span>
+          </button>
+          <button id="queue-cancel" class="btn danger large" disabled>
+            <span class="btn-label">Payment posted → cancel scheduled SMS</span>
+            <span class="btn-endpoint">POST <code>/…/Messages/{Sid}.json</code> · <code>Status=canceled</code></span>
+          </button>
+        </div>
       </div>
 
       <div class="two-col">
         <div class="sub-panel">
           <h3>Today's reminder queue</h3>
-          <p class="sub">Only the highlighted row is your real cell. Peers use the reserved 555-01xx fictional block and will resolve as <code>unaddressable</code> — a real demo of Bulk's per-recipient status without spamming anyone.</p>
+          <p class="sub">Only Jane's row (highlighted) is the real cell used for the schedule + cancel demo. Peer rows are visual queue context — they are not scheduled with Twilio during this scene.</p>
           <table class="queue-table" id="queue-table">
             <thead><tr>
-              <th>Cardholder</th><th>Last 4</th><th>Due</th><th>Amount</th><th>Status</th><th></th>
+              <th>Cardholder</th><th>Last 4</th><th>Amount</th><th>Message SID</th><th>Status</th>
             </tr></thead>
             <tbody></tbody>
           </table>
         </div>
         <div class="sub-panel">
           <h3>Live event timeline</h3>
-          <p class="sub">Every payment webhook, suppression, and send fire is stamped here as it happens.</p>
+          <p class="sub">Every scheduled send, payment webhook, and cancel confirmation is stamped here as it happens.</p>
           <ol id="timeline" class="timeline"></ol>
+
+          <h3 style="margin-top: 18px;">Verify in Twilio Console</h3>
+          <p class="sub">After scheduling, open the message in Console to watch the status flip live.</p>
+          <div id="console-link" class="console-link">
+            <span class="sub">Schedule a message to reveal its Console link.</span>
+          </div>
         </div>
       </div>
     </section>

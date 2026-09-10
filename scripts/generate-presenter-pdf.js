@@ -109,7 +109,7 @@ p('The fourth use case (business-user campaign administration) is addressed as a
 
 h2('Three scenes, one browser, one cell phone');
 keyValue('Scene A', 'Send Surge past-due reminder — high-volume, personalized, scheduled.');
-keyValue('Scene B', 'Payment-triggered suppression — real-time list-right-before-send.');
+keyValue('Scene B', 'Cancel a scheduled SMS via Update Message · Status=canceled.');
 keyValue('Scene C', 'Response & opt-out — Advanced Opt-Out + free-form capture + DNC.');
 
 h2('What you\'ll ask them to notice');
@@ -168,21 +168,28 @@ say('Same endpoint accepts Content Templates by SID for RCS cards, MMS, WhatsApp
 
 // ────────── SCENE B ──────────
 newPage();
-h1('Scene B · Payment-Triggered Suppression');
-muted('RFP use case 2: eliminate reminders to cardholders who just paid. Target: 3 minutes.');
+h1('Scene B · Cancel a scheduled SMS before it sends');
+muted('RFP use case 2: pull an SMS that\'s already scheduled if the cardholder pays before it fires. Target: 4 minutes.');
 
 h3('Open Scene B tab');
-say('Continental\'s current lag from payment posting to reminder suppression is about fifteen minutes. That means every day, cardholders who paid this morning still get a "past due" reminder at 10am. Watch what real-time suppression looks like.');
+say('If Continental Finance schedules a reminder and the cardholder pays before it sends, they need to stop that SMS. Twilio\'s Programmable Messaging API supports that with one call. Watch three steps.');
 
-step(1, 'Click any peer row\'s "Payment posted" button',
-  'You\'re simulating a webhook from Continental Finance\'s payment system. The peer row grays out with a "Suppressed" badge. The timeline on the right stamps the event. Activity log narrates in plain English.');
-say('That was a payment-posted webhook. Our server suppressed that cardholder from today\'s queue — not on a batch job, immediately.');
+step(1, 'Click "Schedule Jane\'s reminder (20 min from now)"',
+  'Our server calls POST /2010-04-01/Accounts/{AccountSid}/Messages.json with scheduleType=fixed, sendAt=+20min, and the Messaging Service SID. Twilio returns a MessageSid and status=scheduled. Jane\'s row in the queue table: MessageSid populates, status badge flips to "Scheduled" (blue). The Console link on the right lights up.');
+say('Twilio now holds this message on its schedule. It will fire in twenty minutes unless we cancel it first. Point at the activity log — the exact API endpoint and the returned MessageSid are right there.');
 
-step(2, 'Click "Send today\'s 10am reminder"',
-  'Bulk API call fires with only the pending rows. Counters advance. Note in the activity log: "N cardholders — M suppressed by payment." The suppressed cardholder\'s row shows no send.');
-say('The list is re-read at the moment of send, not at scheduling time. Fifteen-minute lag becomes zero. If ten thousand cardholders paid in the ninety seconds between the queue building and the send firing, all ten thousand are automatically excluded.');
+step(2, 'Click "Payment posted → cancel scheduled SMS"',
+  'Simulates Continental Finance\'s payment system posting a payment for Jane. Our server looks up Jane\'s stored MessageSid, then calls POST /2010-04-01/Accounts/{AccountSid}/Messages/{MessageSid}.json with Status=canceled. Twilio flips the status. Row updates: status badge is now "Canceled" (red).');
+say('That was one API call. Update Message with Status=canceled. The scheduled SMS will never be delivered — Twilio drops it before handing off to the carrier.');
 
-muted('Talking point: the payment webhook shape shown here matches what Continental\'s core banking / Fiserv system already produces. This is a plumbing exercise, not a re-architecture.');
+step(3, 'Verify in Twilio Console',
+  'Click the Console link on the right of Scene B (or navigate manually: Console → Monitor → Logs → Messaging → find that MessageSid). Status shows canceled. Refresh to confirm.');
+say('That is the audit record. Continental\'s compliance team, or Amplix during their review, can walk this trail for any message: scheduled at X, canceled at Y, never delivered. No cardholder ever saw the past-due reminder they had already paid.');
+
+h3('Honest note on the cancellation window');
+p('Cancellation is only available while the message is in scheduled status. Twilio moves scheduled messages to queued approximately 15 minutes before the sendAt time. After that, cancellation returns error 30409 and cannot be undone.');
+p('Practical implication for Continental Finance: design the schedule lead time with this window in mind. If cardholders can pay at any time up to the reminder fire time, schedule reminders at least 15 minutes into the future so there is always a cancel window.');
+say('This is documented behavior. If the evaluators ask what happens if payment posts fourteen minutes before send time, the answer is: Twilio returns error thirty-thousand-four-oh-nine, the message is already committed to queue. Design your lead time accordingly.');
 
 // ────────── SCENE C ──────────
 newPage();
