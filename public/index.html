@@ -57,32 +57,94 @@
         <div>
           <div class="eyebrow">Scene A</div>
           <h2>Send a past-due payment reminder</h2>
-          <p>Real Bulk Messaging API call. Personalized per recipient with Liquid variables. Delivery status streams back live.</p>
+          <p>One API call to Twilio Bulk Messaging. Personalized per recipient via Liquid variables. Delivery status streams back in real time.</p>
         </div>
-        <button id="send-btn" class="btn primary">Send Surge past-due reminder</button>
+      </div>
+
+      <div class="coach" data-scene-coach="a">
+        <div class="coach-step" data-step="1">
+          <div class="coach-num">1</div>
+          <div class="coach-text">
+            <b>Click "Send Surge past-due reminder"</b>
+            <span>The browser calls our server at <code>POST /api/campaigns/send</code>, which forwards to Twilio's Bulk API.</span>
+          </div>
+        </div>
+        <div class="coach-arrow">→</div>
+        <div class="coach-step" data-step="2">
+          <div class="coach-num">2</div>
+          <div class="coach-text">
+            <b>Watch the counters</b>
+            <span>Twilio returns <code>202 Accepted</code> + <code>operationId</code>. Our dashboard polls the Operations resource every 750ms.</span>
+          </div>
+        </div>
+        <div class="coach-arrow">→</div>
+        <div class="coach-step" data-step="3">
+          <div class="coach-num">3</div>
+          <div class="coach-text">
+            <b>SMS lands on the cell</b>
+            <span>Real message. Real carrier. The customer thread mirrors what the recipient sees.</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="action-row">
+        <button id="send-btn" class="btn primary large">
+          <span class="btn-label">Send Surge past-due reminder</span>
+          <span class="btn-endpoint">POST <code>comms.twilio.com/v1/Messages</code> · Bulk API</span>
+        </button>
+        <div class="action-legend">
+          <div class="legend-item"><span class="dot green"></span> Delivered = confirmed by carrier</div>
+          <div class="legend-item"><span class="dot amber"></span> Failed = carrier rejected</div>
+          <div class="legend-item"><span class="dot muted"></span> Unaddressable = number not routable</div>
+        </div>
       </div>
 
       <div class="counters">
-        <div class="stat"><label>Operation ID</label><span id="op-id" class="stat-mono">&mdash;</span></div>
-        <div class="stat"><label>HTTP</label><span id="http-status">&mdash;</span></div>
-        <div class="stat"><label>Total</label><span id="stat-total">&mdash;</span></div>
-        <div class="stat green"><label>Delivered</label><span id="stat-delivered">&mdash;</span></div>
-        <div class="stat amber"><label>Failed</label><span id="stat-failed">&mdash;</span></div>
-        <div class="stat muted"><label>Unaddressable</label><span id="stat-unaddressable">&mdash;</span></div>
+        <div class="stat">
+          <label>Operation ID</label>
+          <span id="op-id" class="stat-mono">&mdash;</span>
+          <div class="stat-hint">Returned by Twilio · used to poll status</div>
+        </div>
+        <div class="stat">
+          <label>HTTP</label>
+          <span id="http-status">&mdash;</span>
+          <div class="stat-hint">202 = accepted for delivery</div>
+        </div>
+        <div class="stat">
+          <label>Total</label>
+          <span id="stat-total">&mdash;</span>
+          <div class="stat-hint">Recipients in this batch</div>
+        </div>
+        <div class="stat green">
+          <label>Delivered</label>
+          <span id="stat-delivered">&mdash;</span>
+          <div class="stat-hint">Confirmed delivered</div>
+        </div>
+        <div class="stat amber">
+          <label>Failed</label>
+          <span id="stat-failed">&mdash;</span>
+          <div class="stat-hint">Rejected by carrier</div>
+        </div>
+        <div class="stat muted">
+          <label>Unaddressable</label>
+          <span id="stat-unaddressable">&mdash;</span>
+          <div class="stat-hint">Number not routable</div>
+        </div>
       </div>
 
       <div class="two-col">
         <div class="sub-panel">
           <h3>Customer thread &middot; Jane · &bull;&bull;&bull;&bull; 4832</h3>
+          <p class="sub">What the cardholder sees. Personalized from Liquid template variables sent in the API call.</p>
           <div id="thread" class="thread"></div>
         </div>
         <div class="sub-panel">
           <h3>What this proves</h3>
           <ul class="proof-list">
-            <li><b>One API call, thousands of sends.</b> <code>POST https://comms.twilio.com/v1/Messages</code> with a <code>to[]</code> array of up to 10,000 recipients.</li>
+            <li><b>One API call, thousands of sends.</b> <code>POST /v1/Messages</code> accepts a <code>to[]</code> array of up to 10,000 recipients.</li>
             <li><b>Personalization is native.</b> Liquid variables (<code>{{firstName}}</code>, <code>{{amountDue}}</code>) resolve per-recipient with <code>default</code> filter fallbacks.</li>
-            <li><b>Operations resource returns per-recipient status.</b> Delivered · Failed · Unaddressable counters advance in real time.</li>
-            <li><b>Send window (8am–9pm ET).</b> Continental's own scheduler decides send time. Compliance Toolkit's per-message classification is Programmable Messaging only — we're intentionally not claiming it here.</li>
+            <li><b>Per-recipient status.</b> The Operations resource returns Delivered / Failed / Unaddressable counters that advance in real time.</li>
+            <li><b>Send window (8am–9pm ET).</b> Continental's own scheduler controls send time. Compliance Toolkit is Programmable Messaging only — we intentionally are not claiming it here.</li>
           </ul>
         </div>
       </div>
@@ -96,16 +158,49 @@
           <h2>Suppress reminders the instant a payment posts</h2>
           <p>Continental's current lag is ~15 minutes. With a Fiserv-shaped webhook + list-right-before-send, the lag becomes <b>zero</b>.</p>
         </div>
-        <div class="btn-row">
-          <button id="queue-reset" class="btn ghost">Reset queue</button>
-          <button id="queue-send" class="btn primary">Send today's 10am reminder</button>
+      </div>
+
+      <div class="coach" data-scene-coach="b">
+        <div class="coach-step" data-step="1">
+          <div class="coach-num">1</div>
+          <div class="coach-text">
+            <b>Fiserv posts a payment</b>
+            <span>Click any row's "Payment posted" button. Simulates a payment webhook. Payload: <code>{phone, accountId, amount, postedAt, source}</code>.</span>
+          </div>
         </div>
+        <div class="coach-arrow">→</div>
+        <div class="coach-step" data-step="2">
+          <div class="coach-num">2</div>
+          <div class="coach-text">
+            <b>Recipient removed from pending queue</b>
+            <span>Our server marks the row <code>suppressed</code> in SQLite before the send fires. This is the "list-right-before-send" mechanic.</span>
+          </div>
+        </div>
+        <div class="coach-arrow">→</div>
+        <div class="coach-step" data-step="3">
+          <div class="coach-num">3</div>
+          <div class="coach-text">
+            <b>Send today's 10am reminder</b>
+            <span>Bulk API call goes out with only the pending rows. The suppressed customer gets no message.</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="action-row">
+        <button id="queue-reset" class="btn ghost">
+          <span class="btn-label">Reset queue</span>
+          <span class="btn-endpoint">POST <code>/api/queue/reset</code> · local</span>
+        </button>
+        <button id="queue-send" class="btn primary large">
+          <span class="btn-label">Send today's 10am reminder</span>
+          <span class="btn-endpoint">POST <code>comms.twilio.com/v1/Messages</code> · Bulk API</span>
+        </button>
       </div>
 
       <div class="two-col">
         <div class="sub-panel">
           <h3>Today's reminder queue</h3>
-          <p class="sub">Only the highlighted row is the real customer number. Peers use the reserved 555-01xx fictional block and will resolve as <code>unaddressable</code> — a real demo of Bulk's per-recipient status.</p>
+          <p class="sub">Only the highlighted row is your real cell. Peers use the reserved 555-01xx fictional block and will resolve as <code>unaddressable</code> — a real demo of Bulk's per-recipient status without spamming anyone.</p>
           <table class="queue-table" id="queue-table">
             <thead><tr>
               <th>Cardholder</th><th>Last 4</th><th>Due</th><th>Amount</th><th>Status</th><th></th>
@@ -115,7 +210,7 @@
         </div>
         <div class="sub-panel">
           <h3>Live event timeline</h3>
-          <p class="sub">Every payment webhook, suppression, and send is stamped here.</p>
+          <p class="sub">Every payment webhook, suppression, and send fire is stamped here as it happens.</p>
           <ol id="timeline" class="timeline"></ol>
         </div>
       </div>
@@ -127,23 +222,52 @@
         <div>
           <div class="eyebrow">Scene C</div>
           <h2>Every inbound message, captured and actionable</h2>
-          <p>STOP / START / HELP handled natively by Advanced Opt-Out. Everything else lands in the Ops Review Queue for human review.</p>
+          <p>STOP / START / HELP handled natively by Twilio's Advanced Opt-Out (Messaging Service, Console-configured). Everything else lands in an Ops Review Queue for human review.</p>
         </div>
-        <div class="prompt-card">
-          <div class="prompt-label">From your cell, text either:</div>
-          <div class="prompt-example"><code>STOP</code> <span class="prompt-arrow">→</span> Advanced Opt-Out custom reply</div>
-          <div class="prompt-example"><code>please stop bugging me</code> <span class="prompt-arrow">→</span> Ops Review Queue</div>
+      </div>
+
+      <div class="coach" data-scene-coach="c">
+        <div class="coach-step" data-step="1">
+          <div class="coach-num">1</div>
+          <div class="coach-text">
+            <b>Text <code>STOP</code> from your cell</b>
+            <span>Advanced Opt-Out matches the keyword. Twilio replies with the custom Surge confirmation, adds the number to the block list, and POSTs to our webhook with <code>OptOutType=STOP</code>.</span>
+          </div>
         </div>
+        <div class="coach-arrow">→</div>
+        <div class="coach-step" data-step="2">
+          <div class="coach-num">2</div>
+          <div class="coach-text">
+            <b>Text <code>please stop bugging me</code></b>
+            <span>No keyword match. Twilio POSTs the raw text to our inbound webhook. Row appears in the Ops Review Queue awaiting human action.</span>
+          </div>
+        </div>
+        <div class="coach-arrow">→</div>
+        <div class="coach-step" data-step="3">
+          <div class="coach-num">3</div>
+          <div class="coach-text">
+            <b>Click "Add to DNC"</b>
+            <span>Adds to our app-side suppression list. Any future Bulk send filters this number out before the API call — no accidental sends.</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="prompt-card">
+        <div class="prompt-label">Text the Surge long code from your cell:</div>
+        <div class="prompt-example"><code>STOP</code> <span class="prompt-arrow">→</span> Advanced Opt-Out (custom Surge reply)</div>
+        <div class="prompt-example"><code>please stop bugging me</code> <span class="prompt-arrow">→</span> Ops Review Queue</div>
+        <div class="prompt-example"><code>START</code> <span class="prompt-arrow">→</span> re-opts (Advanced Opt-Out block list removes number)</div>
       </div>
 
       <div class="two-col">
         <div class="sub-panel">
           <h3>Inbound stream</h3>
+          <p class="sub"><b>Red border</b> = Advanced Opt-Out already handled it (STOP/START/HELP). <b>Amber border</b> = free-form text needing human review.</p>
           <div id="inbound-list" class="inbound-list"></div>
         </div>
         <div class="sub-panel">
-          <h3>Do-Not-Contact list (app-side suppression)</h3>
-          <p class="sub">Separate from Twilio's Advanced Opt-Out block list. Enforces cross-sender suppression the RFP asks for. Attempting to send to a DNC'd number returns <code>21610</code>.</p>
+          <h3>Do-Not-Contact list (app-side)</h3>
+          <p class="sub">Separate from Twilio's Advanced Opt-Out block list. Enforces cross-sender suppression the RFP asks for. Attempting to send to a DNC'd number returns error <code>21610</code>.</p>
           <div id="dnc-list" class="dnc-list"></div>
         </div>
       </div>
@@ -172,9 +296,29 @@
         <div class="sub-panel warn">
           <h3>Where we concede honestly</h3>
           <p><b>Changing the SMS body copy itself still requires an application code change.</b> Twilio does not ship a business-user editor for SMS body text.</p>
-          <p>If Continental wants a business-user-facing content editor on top of Bulk Messaging, that's a scoped services engagement — separately quoted. We won't fake it in this demo.</p>
+          <p>If Continental wants a business-user-facing content editor on top of Bulk Messaging, that is a scoped services engagement — separately quoted. We won't fake it in this demo.</p>
           <p class="sub">For everything except message body copy, Console + IAM roles cover it.</p>
         </div>
+      </div>
+    </section>
+
+    <!-- ────────── ACTIVITY LOG (persistent) ────────── -->
+    <section class="activity-panel">
+      <div class="activity-header">
+        <div>
+          <div class="eyebrow">Live activity</div>
+          <h3>What just happened · API calls &amp; Twilio events</h3>
+        </div>
+        <div class="activity-legend">
+          <span class="legend-item"><span class="dot red"></span> Bulk API</span>
+          <span class="legend-item"><span class="dot amber"></span> Server / webhook</span>
+          <span class="legend-item"><span class="dot green"></span> Twilio → us</span>
+          <span class="legend-item"><span class="dot muted"></span> Local</span>
+          <button id="activity-clear" class="btn small ghost">Clear</button>
+        </div>
+      </div>
+      <div id="activity-log" class="activity-log">
+        <div class="activity-placeholder">Waiting for the first action. Click any scene button and events will narrate here in real time.</div>
       </div>
     </section>
 
