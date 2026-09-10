@@ -163,9 +163,10 @@ function renderTemplate(text, vars) {
   return text.replace(/\{\{\s*([a-zA-Z0-9_]+)(?:\s*\|\s*default:\s*'([^']*)')?\s*\}\}/g,
     (_, k, fallback) => (vars && vars[k] != null ? vars[k] : (fallback || '')));
 }
-function setRaw(request, response) {
-  if (request) $('raw-request').textContent = JSON.stringify(request, null, 2);
-  if (response) $('raw-response').textContent = JSON.stringify(response, null, 2);
+function setRaw(request, response, endpoint) {
+  if (request !== undefined) $('raw-request').textContent = request === null ? '—' : JSON.stringify(request, null, 2);
+  if (response !== undefined) $('raw-response').textContent = response === null ? '—' : JSON.stringify(response, null, 2);
+  if (endpoint) $('raw-endpoint').textContent = endpoint;
 }
 
 async function fireCampaign({ scheduleFor, buttonId, scheduleLabel } = {}) {
@@ -191,7 +192,7 @@ async function fireCampaign({ scheduleFor, buttonId, scheduleLabel } = {}) {
     const ms = Math.round(performance.now() - started);
     $('http-status').textContent = res.status;
     $('op-id').textContent = data.operationId || '—';
-    setRaw(undefined, data);
+    setRaw(undefined, data, 'POST https://comms.twilio.com/v1/Messages · Bulk API');
 
     let plain;
     if (!res.ok) {
@@ -328,6 +329,11 @@ $('queue-schedule').addEventListener('click', async () => {
       return;
     }
     scheduledMessageSidClient = data.messageSid;
+    setRaw(
+      data.request,
+      { sid: data.messageSid, status: data.status, sendAt: data.sendAt, dateCreated: data.dateCreated },
+      'POST https://api.twilio.com/2010-04-01/Accounts/{Sid}/Messages.json · Programmable Messaging'
+    );
     logActivity({
       kind: 'bulk', tag: 'Twilio API',
       tech: 'POST https://api.twilio.com/2010-04-01/Accounts/{Sid}/Messages.json',
@@ -384,6 +390,11 @@ $('queue-cancel').addEventListener('click', async () => {
       });
       return;
     }
+    setRaw(
+      { messagesResource: `/2010-04-01/Accounts/{AccountSid}/Messages/${data.messageSid}.json`, method: 'POST', body: { Status: 'canceled' } },
+      data.response || { sid: data.messageSid, status: data.status },
+      `POST https://api.twilio.com/2010-04-01/Accounts/{Sid}/Messages/${data.messageSid}.json · Update Message`
+    );
     logActivity({
       kind: 'bulk', tag: 'Twilio API',
       tech: `POST https://api.twilio.com/2010-04-01/Accounts/{Sid}/Messages/${data.messageSid}.json · Status=canceled`,
@@ -514,7 +525,11 @@ es.onmessage = (e) => {
     const evt = JSON.parse(e.data);
     switch (evt.type) {
       case 'campaign.submitted': {
-        setRaw(evt.request, { status: evt.status, body: evt.response && evt.response.body, headers: evt.response && evt.response.headers });
+        setRaw(
+          evt.request,
+          { status: evt.status, body: evt.response && evt.response.body, headers: evt.response && evt.response.headers },
+          'POST https://comms.twilio.com/v1/Messages · Bulk API'
+        );
         const body = (evt.request && evt.request.content && evt.request.content.text) || '';
         const firstRecipient = evt.request && evt.request.to && evt.request.to[0];
         const vars = (firstRecipient && firstRecipient.variables) || {};
