@@ -165,7 +165,6 @@ step(3, 'Point at the "Rich content, same API" bullet',
   'Bottom of the "What this proves" panel.');
 say('Same endpoint accepts Content Templates by SID for RCS cards, MMS, WhatsApp — and with a channels.priority array of RCS then SMS, Twilio delivers the richest format the cardholder\'s device supports and automatically falls back to SMS for everyone else. One payload, one API, best-format-per-cardholder.');
 
-muted('Compliance Toolkit honesty note: Compliance Toolkit is a Programmable Messaging feature — not exposed on Bulk. We intentionally are not claiming per-message quiet-hours enforcement here. Your scheduler stays in control of the send window, or you use schedule.sendAt as shown.');
 
 // ────────── SCENE B ──────────
 newPage();
@@ -245,9 +244,6 @@ say('The RFP explicitly asks for business-user self-service without IT code chan
 newPage();
 h1('Honest concessions summary');
 muted('You will get asked. Answer directly.');
-
-h2('Compliance Toolkit (Quiet Hours enforcement)');
-p('Programmable Messaging only — not exposed on the Bulk endpoint. Per-message controls (messageIntent, riskCheck) can\'t be overridden on Bulk sends. Continental keeps quiet-hours enforcement in their own scheduler, or uses Bulk\'s schedule.sendAt with timezone-localized delivery.');
 
 h2('Business-user SMS body editor');
 p('Twilio does not ship this. Console covers DNC, sender config, opt-out wording, scheduling, monitoring — but NOT body copy. Body copy edits are a code change, or a services engagement to build a content editor on top of Bulk.');
