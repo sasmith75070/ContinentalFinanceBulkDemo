@@ -144,7 +144,8 @@
             <li><b>One API call, thousands of sends.</b> <code>POST /v1/Messages</code> accepts a <code>to[]</code> array of up to 10,000 recipients.</li>
             <li><b>Personalization is native.</b> Liquid variables (<code>{{firstName}}</code>, <code>{{amountDue}}</code>) resolve per-recipient with <code>default</code> filter fallbacks.</li>
             <li><b>Per-recipient status.</b> The Operations resource returns Delivered / Failed / Unaddressable counters that advance in real time.</li>
-            <li><b>Send window (8am–9pm ET).</b> Continental Finance's own scheduler controls send time. Compliance Toolkit is Programmable Messaging only — we are intentionally not claiming it here.</li>
+            <li><b>Native scheduling, up to 7 days out.</b> Pass <code>schedule.sendAt</code> in the same API call. Omit the timezone and Twilio auto-localizes each cardholder's send time — so an 8am–9pm ET window becomes 8am–9pm <i>local</i> for every cardholder, without per-zone logic in Continental Finance's scheduler.</li>
+            <li><b>Compliance Toolkit note.</b> Programmable Messaging only; not exposed on Bulk. We are intentionally not claiming it here.</li>
           </ul>
         </div>
       </div>
