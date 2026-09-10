@@ -60,14 +60,6 @@ $$('.scene-tab').forEach((tab) => {
   });
 });
 
-// ────────── Live clock ──────────
-function tickClock() {
-  const now = new Date();
-  const el = $('live-clock');
-  if (el) el.textContent = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
-}
-setInterval(tickClock, 1000); tickClock();
-
 // ────────── Operations polling ──────────
 const sessionOperations = {};
 let pollTimer = null;
@@ -509,16 +501,14 @@ function renderDnc(rows) {
 }
 
 // ────────── SSE ──────────
-const sseStatusEl = $('sse-status');
 const es = new EventSource('/events');
 es.addEventListener('hello', () => {
-  sseStatusEl.textContent = 'SSE: connected';
   logActivity({
     kind: 'local', tag: 'Ready',
     plain: 'Dashboard connected to server-sent-events stream. Live events from Twilio and the server will appear here.',
   });
 });
-es.onerror = () => { sseStatusEl.textContent = 'SSE: reconnecting…'; };
+es.onerror = () => { /* connection dropped; browser will auto-reconnect */ };
 
 es.onmessage = (e) => {
   try {
