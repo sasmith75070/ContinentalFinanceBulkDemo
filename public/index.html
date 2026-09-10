@@ -139,6 +139,24 @@
           </ul>
         </div>
       </div>
+
+      <div class="activity-panel scene-activity">
+        <div class="activity-header">
+          <div>
+            <div class="eyebrow">Live activity · Scene A</div>
+            <h3>What just happened · API calls &amp; Twilio events</h3>
+          </div>
+          <div class="activity-legend">
+            <span class="legend-item"><span class="dot red"></span> Bulk API</span>
+            <span class="legend-item"><span class="dot amber"></span> Server</span>
+            <span class="legend-item"><span class="dot green"></span> Twilio → us</span>
+            <button class="btn small ghost activity-clear" data-scene="a">Clear</button>
+          </div>
+        </div>
+        <div id="activity-log-a" class="activity-log">
+          <div class="activity-placeholder">Click Send now or Schedule and events narrate here in real time.</div>
+        </div>
+      </div>
     </section>
 
     <!-- ────────── SCENE B ────────── -->
@@ -221,6 +239,23 @@
           </div>
         </div>
       </div>
+
+      <div class="activity-panel scene-activity">
+        <div class="activity-header">
+          <div>
+            <div class="eyebrow">Live activity · Scene B</div>
+            <h3>What just happened · API calls &amp; Twilio events</h3>
+          </div>
+          <div class="activity-legend">
+            <span class="legend-item"><span class="dot red"></span> Twilio API</span>
+            <span class="legend-item"><span class="dot amber"></span> Server / webhook</span>
+            <button class="btn small ghost activity-clear" data-scene="b">Clear</button>
+          </div>
+        </div>
+        <div id="activity-log-b" class="activity-log">
+          <div class="activity-placeholder">Click Schedule Jane's reminder to begin.</div>
+        </div>
+      </div>
     </section>
 
     <!-- ────────── SCENE C ────────── -->
@@ -282,25 +317,22 @@
           <div id="dnc-list" class="dnc-list"></div>
         </div>
       </div>
-    </section>
 
-    <!-- ────────── ACTIVITY LOG (persistent) ────────── -->
-    <section class="activity-panel">
-      <div class="activity-header">
-        <div>
-          <div class="eyebrow">Live activity</div>
-          <h3>What just happened · API calls &amp; Twilio events</h3>
+      <div class="activity-panel scene-activity">
+        <div class="activity-header">
+          <div>
+            <div class="eyebrow">Live activity · Scene C</div>
+            <h3>What just happened · Inbound &amp; DNC events</h3>
+          </div>
+          <div class="activity-legend">
+            <span class="legend-item"><span class="dot green"></span> Twilio → us (inbound)</span>
+            <span class="legend-item"><span class="dot amber"></span> Server</span>
+            <button class="btn small ghost activity-clear" data-scene="c">Clear</button>
+          </div>
         </div>
-        <div class="activity-legend">
-          <span class="legend-item"><span class="dot red"></span> Bulk API</span>
-          <span class="legend-item"><span class="dot amber"></span> Server / webhook</span>
-          <span class="legend-item"><span class="dot green"></span> Twilio → us</span>
-          <span class="legend-item"><span class="dot muted"></span> Local</span>
-          <button id="activity-clear" class="btn small ghost">Clear</button>
+        <div id="activity-log-c" class="activity-log">
+          <div class="activity-placeholder">Text the Continental Finance SMS line to see inbound events narrate here.</div>
         </div>
-      </div>
-      <div id="activity-log" class="activity-log">
-        <div class="activity-placeholder">Waiting for the first action. Click any scene button and events will narrate here in real time.</div>
       </div>
     </section>
 

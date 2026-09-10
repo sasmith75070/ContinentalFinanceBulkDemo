@@ -1,13 +1,13 @@
 const $ = (id) => document.getElementById(id);
 const $$ = (sel) => document.querySelectorAll(sel);
 
-// ────────── Activity log (persistent narrator) ──────────
-// Every API call and every SSE event lands here with a plain-English
-// explanation next to the technical detail. This is what the customer
-// evaluation team reads to understand what the demo is doing.
-const activityLogEl = $('activity-log');
-
-function logActivity({ tag, tech, plain, doc, status, statusClass, kind }) {
+// ────────── Per-scene activity log ──────────
+// Each scene tab has its own log. Every logActivity call routes to the
+// scene named in its `scene` field. Events from other scenes never bleed in.
+function logActivity({ scene, tag, tech, plain, doc, status, statusClass, kind }) {
+  if (!scene) return;                              // must be scoped to a scene
+  const activityLogEl = document.getElementById(`activity-log-${scene}`);
+  if (!activityLogEl) return;
   const placeholder = activityLogEl.querySelector('.activity-placeholder');
   if (placeholder) placeholder.remove();
 
@@ -25,12 +25,15 @@ function logActivity({ tag, tech, plain, doc, status, statusClass, kind }) {
       ${doc ? `<div class="act-doc"><a href="${doc.url}" target="_blank" rel="noreferrer">${doc.label} ↗</a></div>` : ''}
     </div>
     <div class="act-status ${statusClass || ''}">${status || ''}</div>`;
-  // flex-direction: column-reverse means visually-newest goes at TOP by appending
   activityLogEl.appendChild(row);
 }
 
-$('activity-clear').addEventListener('click', () => {
-  activityLogEl.innerHTML = '<div class="activity-placeholder">Cleared. Trigger another action to see live events.</div>';
+document.querySelectorAll('.activity-clear').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    const scene = btn.dataset.scene;
+    const el = document.getElementById(`activity-log-${scene}`);
+    if (el) el.innerHTML = '<div class="activity-placeholder">Cleared. Trigger another action to see live events.</div>';
+  });
 });
 
 // ────────── Coach steps ──────────
@@ -52,11 +55,6 @@ $$('.scene-tab').forEach((tab) => {
     const scene = tab.dataset.scene;
     $$('.scene-tab').forEach((t) => t.classList.toggle('active', t === tab));
     $$('.scene[data-scene]').forEach((s) => s.classList.toggle('hidden', s.dataset.scene !== scene));
-    logActivity({
-      kind: 'local',
-      tag: 'Nav',
-      plain: `Switched to Scene ${scene.toUpperCase()}.`,
-    });
   });
 });
 
@@ -100,6 +98,7 @@ async function pollSingle(opId) {
     );
     if (changed) {
       logActivity({
+        scene: 'a',
         kind: 'twilio-in',
         tag: 'Bulk Ops',
         tech: `GET /v1/Messages/Operations/${opId} · status: ${next.status}`,
@@ -166,6 +165,7 @@ async function fireCampaign({ scheduleFor, buttonId, scheduleLabel } = {}) {
   btn.disabled = true;
   advanceCoach('a', 2);
   logActivity({
+    scene: 'a',
     kind: 'server',
     tag: 'Server',
     tech: `POST /api/campaigns/send${scheduleFor ? ' · scheduleFor=' + scheduleFor : ''}`,
@@ -196,6 +196,7 @@ async function fireCampaign({ scheduleFor, buttonId, scheduleLabel } = {}) {
     }
 
     logActivity({
+      scene: 'a',
       kind: 'bulk',
       tag: 'Bulk API',
       tech: 'POST https://comms.twilio.com/v1/Messages',
@@ -210,7 +211,7 @@ async function fireCampaign({ scheduleFor, buttonId, scheduleLabel } = {}) {
     if (data.operationId) { primeOperation(data.operationId, data.recipientCount); advanceCoach('a', 3); }
   } catch (err) {
     $('raw-response').textContent = `ERROR: ${err.message}`;
-    logActivity({ kind: 'local', tag: 'Error', plain: `Send failed locally: ${err.message}`, statusClass: 'err' });
+    logActivity({ scene: 'a', kind: 'local', tag: 'Error', plain: `Send failed locally: ${err.message}`, statusClass: 'err' });
   } finally {
     btn.disabled = false;
   }
@@ -291,6 +292,7 @@ $('queue-reset').addEventListener('click', async () => {
   $('queue-cancel').disabled = true;
   setConsoleLink(null);
   logActivity({
+    scene: 'b',
     kind: 'server', tag: 'Server',
     tech: 'POST /api/queue/reset',
     plain: `Rebuilding today's Surge Mastercard reminder queue — no Twilio call.`,
@@ -306,6 +308,7 @@ $('queue-schedule').addEventListener('click', async () => {
   btn.disabled = true;
   advanceCoach('b', 1);
   logActivity({
+    scene: 'b',
     kind: 'server', tag: 'Server',
     tech: 'POST /api/queue/schedule',
     plain: `Dashboard asks the server to schedule Jane's Surge reminder 20 minutes from now.`,
@@ -316,7 +319,7 @@ $('queue-schedule').addEventListener('click', async () => {
     const data = await res.json();
     const ms = Math.round(performance.now() - started);
     if (!res.ok) {
-      logActivity({ kind: 'local', tag: 'Error', tech: `HTTP ${res.status}`, plain: data.error || 'Schedule failed', status: `${res.status} · ${ms}ms`, statusClass: 'err' });
+      logActivity({ scene: 'b', kind: 'local', tag: 'Error', tech: `HTTP ${res.status}`, plain: data.error || 'Schedule failed', status: `${res.status} · ${ms}ms`, statusClass: 'err' });
       addTimeline({ label: 'Schedule failed', detail: data.error || `HTTP ${res.status}`, kind: 'suppress' });
       return;
     }
@@ -327,6 +330,7 @@ $('queue-schedule').addEventListener('click', async () => {
       'POST https://api.twilio.com/2010-04-01/Accounts/{Sid}/Messages.json · Programmable Messaging'
     );
     logActivity({
+      scene: 'b',
       kind: 'bulk', tag: 'Twilio API',
       tech: 'POST https://api.twilio.com/2010-04-01/Accounts/{Sid}/Messages.json',
       plain: `Twilio Programmable Messaging accepted the scheduled send.<br>
@@ -349,10 +353,11 @@ $('queue-schedule').addEventListener('click', async () => {
 
 $('queue-cancel').addEventListener('click', async () => {
   const btn = $('queue-cancel');
-  if (!customerPhoneClient) { logActivity({ kind: 'local', tag: 'Error', plain: 'No customer phone in queue.' }); return; }
+  if (!customerPhoneClient) { logActivity({ scene: 'b', kind: 'local', tag: 'Error', plain: 'No customer phone in queue.' }); return; }
   btn.disabled = true;
   advanceCoach('b', 2);
   logActivity({
+    scene: 'b',
     kind: 'server', tag: 'Payment webhook',
     tech: 'POST /webhooks/payment',
     plain: `Continental Finance's payment system posts a payment for Jane. Server looks up her MessageSid.`,
@@ -375,6 +380,7 @@ $('queue-cancel').addEventListener('click', async () => {
     if (!res.ok) {
       const hint = data.hint ? `<br><i>${data.hint}</i>` : '';
       logActivity({
+        scene: 'b',
         kind: 'local', tag: 'Cancel failed',
         tech: `HTTP ${res.status} · code ${data.code || '—'}`,
         plain: `${data.error || 'Cancel failed'}${hint}`,
@@ -388,6 +394,7 @@ $('queue-cancel').addEventListener('click', async () => {
       `POST https://api.twilio.com/2010-04-01/Accounts/{Sid}/Messages/${data.messageSid}.json · Update Message`
     );
     logActivity({
+      scene: 'b',
       kind: 'bulk', tag: 'Twilio API',
       tech: `POST https://api.twilio.com/2010-04-01/Accounts/{Sid}/Messages/${data.messageSid}.json · Status=canceled`,
       plain: `Twilio flipped the message status.<br>
@@ -433,6 +440,7 @@ function renderInbound(rows) {
       const phone = btn.dataset.phone;
       advanceCoach('c', 3);
       logActivity({
+        scene: 'c',
         kind: 'server', tag: 'Server',
         tech: 'POST /api/dnc/add',
         plain: `Adding <code>${phone}</code> to the app-side Do-Not-Contact list. All future Bulk sends will filter this number out before the API call.`,
@@ -487,6 +495,7 @@ function renderDnc(rows) {
       btn.disabled = true;
       const phone = btn.dataset.phone;
       logActivity({
+        scene: 'c',
         kind: 'server', tag: 'Server',
         tech: 'POST /api/dnc/remove',
         plain: `Removing <code>${phone}</code> from the app-side DNC list. Note: Twilio's own opt-out block list is Console-managed; the customer must text START to fully re-opt.`,
@@ -502,12 +511,7 @@ function renderDnc(rows) {
 
 // ────────── SSE ──────────
 const es = new EventSource('/events');
-es.addEventListener('hello', () => {
-  logActivity({
-    kind: 'local', tag: 'Ready',
-    plain: 'Dashboard connected to server-sent-events stream. Live events from Twilio and the server will appear here.',
-  });
-});
+es.addEventListener('hello', () => { /* connected — no chrome needed */ });
 es.onerror = () => { /* connection dropped; browser will auto-reconnect */ };
 
 es.onmessage = (e) => {
@@ -553,6 +557,7 @@ es.onmessage = (e) => {
         if (evt.optOutType) {
           addSystem(`Advanced Opt-Out matched: ${evt.optOutType}`);
           logActivity({
+            scene: 'c',
             kind: 'twilio-in', tag: 'Twilio Inbound',
             tech: `POST /webhooks/twilio/inbound · OptOutType=${evt.optOutType}`,
             plain: `Twilio's <b>Advanced Opt-Out</b> matched <code>${evt.optOutType}</code>. Twilio already sent the custom Surge confirmation reply and added the number to its block list. Our webhook received the event with an <code>OptOutType</code> header for audit.`,
@@ -561,6 +566,7 @@ es.onmessage = (e) => {
           advanceCoach('c', 2);
         } else {
           logActivity({
+            scene: 'c',
             kind: 'twilio-in', tag: 'Twilio Inbound',
             tech: 'POST /webhooks/twilio/inbound',
             plain: `Twilio delivered a free-form inbound SMS from <code>${evt.from}</code>: "${escapeHtml(evt.body || '')}". No keyword matched — the message lands in the Ops Review Queue for a human.`,
@@ -574,6 +580,7 @@ es.onmessage = (e) => {
         loadDnc(); loadInbound();
         addTimeline({ label: 'Added to DNC', detail: evt.phone, kind: 'suppress', at: evt.at });
         logActivity({
+          scene: 'c',
           kind: 'twilio-in', tag: 'DNC',
           plain: `<code>${evt.phone}</code> now on the app-side DNC list. Future sends will filter this number.`,
         });
