@@ -7,6 +7,8 @@ const sendRouter = require('./routes/send');
 const operationsRouter = require('./routes/operations');
 const inboundRouter = require('./routes/inbound');
 const statusRouter = require('./routes/status');
+const queueRouter = require('./routes/queue');
+const dncRouter = require('./routes/dnc');
 
 const app = express();
 app.use(express.json());
@@ -17,6 +19,8 @@ app.use(sendRouter);
 app.use(operationsRouter);
 app.use(inboundRouter);
 app.use(statusRouter);
+app.use(queueRouter);
+app.use(dncRouter);
 
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {

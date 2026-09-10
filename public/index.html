@@ -3,48 +3,196 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Continental Finance • Surge Mastercard SMS</title>
+  <title>Continental Finance · Surge Mastercard SMS</title>
   <link rel="stylesheet" href="/styles.css" />
 </head>
 <body>
-  <header>
+  <header class="site-header">
     <div class="brand">
-      <span class="brand-mark">SURGE</span>
-      <span class="brand-sub">Mastercard SMS Operations</span>
+      <div class="brand-card">
+        <span class="brand-chip"></span>
+        <div class="brand-text">
+          <div class="brand-mark">SURGE</div>
+          <div class="brand-sub">MASTERCARD&reg;</div>
+        </div>
+      </div>
+      <div class="brand-line">
+        <div class="brand-title">SMS Operations Center</div>
+        <div class="brand-caption">Continental Finance &middot; powered by Twilio Bulk Messaging</div>
+      </div>
     </div>
-    <div class="env-status" id="env-status">Twilio Bulk Messaging Demo</div>
+    <div class="header-meta">
+      <div class="pill"><span class="pill-dot"></span> Live · <span id="live-clock">--:--:--</span></div>
+      <div class="pill secondary" id="sse-status">SSE: connecting…</div>
+    </div>
   </header>
 
+  <nav class="scenes">
+    <button class="scene-tab active" data-scene="a">
+      <span class="tab-num">A</span>
+      <span class="tab-title">Payment Reminder</span>
+      <span class="tab-sub">RFP use case 1</span>
+    </button>
+    <button class="scene-tab" data-scene="b">
+      <span class="tab-num">B</span>
+      <span class="tab-title">Payment Suppression</span>
+      <span class="tab-sub">RFP use case 2</span>
+    </button>
+    <button class="scene-tab" data-scene="c">
+      <span class="tab-num">C</span>
+      <span class="tab-title">Response &amp; Opt-Out</span>
+      <span class="tab-sub">RFP use case 3</span>
+    </button>
+    <button class="scene-tab" data-scene="d">
+      <span class="tab-num">D</span>
+      <span class="tab-title">Admin</span>
+      <span class="tab-sub">RFP use case 4 · talk-track</span>
+    </button>
+  </nav>
+
   <main>
-    <section class="panel">
-      <h2>Scene A — Payment Reminder</h2>
-      <p>Send a Surge past-due reminder to the demo customer via the Twilio Bulk Messaging API.</p>
-      <button id="send-btn">Send Surge past-due reminder</button>
-      <div class="counters" id="counters">
-        <div><label>Operation</label><span id="op-id">&mdash;</span></div>
-        <div><label>HTTP</label><span id="http-status">&mdash;</span></div>
-        <div><label>Total</label><span id="stat-total">&mdash;</span></div>
-        <div><label>Delivered</label><span id="stat-delivered">&mdash;</span></div>
-        <div><label>Failed</label><span id="stat-failed">&mdash;</span></div>
-        <div><label>Unaddressable</label><span id="stat-unaddressable">&mdash;</span></div>
+    <!-- ────────── SCENE A ────────── -->
+    <section class="scene" data-scene="a">
+      <div class="scene-head">
+        <div>
+          <div class="eyebrow">Scene A</div>
+          <h2>Send a past-due payment reminder</h2>
+          <p>Real Bulk Messaging API call. Personalized per recipient with Liquid variables. Delivery status streams back live.</p>
+        </div>
+        <button id="send-btn" class="btn primary">Send Surge past-due reminder</button>
+      </div>
+
+      <div class="counters">
+        <div class="stat"><label>Operation ID</label><span id="op-id" class="stat-mono">&mdash;</span></div>
+        <div class="stat"><label>HTTP</label><span id="http-status">&mdash;</span></div>
+        <div class="stat"><label>Total</label><span id="stat-total">&mdash;</span></div>
+        <div class="stat green"><label>Delivered</label><span id="stat-delivered">&mdash;</span></div>
+        <div class="stat amber"><label>Failed</label><span id="stat-failed">&mdash;</span></div>
+        <div class="stat muted"><label>Unaddressable</label><span id="stat-unaddressable">&mdash;</span></div>
+      </div>
+
+      <div class="two-col">
+        <div class="sub-panel">
+          <h3>Customer thread &middot; Jane · &bull;&bull;&bull;&bull; 4832</h3>
+          <div id="thread" class="thread"></div>
+        </div>
+        <div class="sub-panel">
+          <h3>What this proves</h3>
+          <ul class="proof-list">
+            <li><b>One API call, thousands of sends.</b> <code>POST https://comms.twilio.com/v1/Messages</code> with a <code>to[]</code> array of up to 10,000 recipients.</li>
+            <li><b>Personalization is native.</b> Liquid variables (<code>{{firstName}}</code>, <code>{{amountDue}}</code>) resolve per-recipient with <code>default</code> filter fallbacks.</li>
+            <li><b>Operations resource returns per-recipient status.</b> Delivered · Failed · Unaddressable counters advance in real time.</li>
+            <li><b>Send window (8am–9pm ET).</b> Continental's own scheduler decides send time. Compliance Toolkit's per-message classification is Programmable Messaging only — we're intentionally not claiming it here.</li>
+          </ul>
+        </div>
       </div>
     </section>
 
-    <section class="panel">
-      <h2>Customer thread</h2>
-      <div id="thread" class="thread"></div>
+    <!-- ────────── SCENE B ────────── -->
+    <section class="scene hidden" data-scene="b">
+      <div class="scene-head">
+        <div>
+          <div class="eyebrow">Scene B</div>
+          <h2>Suppress reminders the instant a payment posts</h2>
+          <p>Continental's current lag is ~15 minutes. With a Fiserv-shaped webhook + list-right-before-send, the lag becomes <b>zero</b>.</p>
+        </div>
+        <div class="btn-row">
+          <button id="queue-reset" class="btn ghost">Reset queue</button>
+          <button id="queue-send" class="btn primary">Send today's 10am reminder</button>
+        </div>
+      </div>
+
+      <div class="two-col">
+        <div class="sub-panel">
+          <h3>Today's reminder queue</h3>
+          <p class="sub">Only the highlighted row is the real customer number. Peers use the reserved 555-01xx fictional block and will resolve as <code>unaddressable</code> — a real demo of Bulk's per-recipient status.</p>
+          <table class="queue-table" id="queue-table">
+            <thead><tr>
+              <th>Cardholder</th><th>Last 4</th><th>Due</th><th>Amount</th><th>Status</th><th></th>
+            </tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div class="sub-panel">
+          <h3>Live event timeline</h3>
+          <p class="sub">Every payment webhook, suppression, and send is stamped here.</p>
+          <ol id="timeline" class="timeline"></ol>
+        </div>
+      </div>
     </section>
 
-    <section class="panel raw">
-      <h2>Raw API</h2>
-      <div class="raw-block">
-        <h3>Request &mdash; POST https://comms.twilio.com/v1/Messages</h3>
-        <pre id="raw-request">&mdash;</pre>
+    <!-- ────────── SCENE C ────────── -->
+    <section class="scene hidden" data-scene="c">
+      <div class="scene-head">
+        <div>
+          <div class="eyebrow">Scene C</div>
+          <h2>Every inbound message, captured and actionable</h2>
+          <p>STOP / START / HELP handled natively by Advanced Opt-Out. Everything else lands in the Ops Review Queue for human review.</p>
+        </div>
+        <div class="prompt-card">
+          <div class="prompt-label">From your cell, text either:</div>
+          <div class="prompt-example"><code>STOP</code> <span class="prompt-arrow">→</span> Advanced Opt-Out custom reply</div>
+          <div class="prompt-example"><code>please stop bugging me</code> <span class="prompt-arrow">→</span> Ops Review Queue</div>
+        </div>
       </div>
-      <div class="raw-block">
-        <h3>Response</h3>
-        <pre id="raw-response">&mdash;</pre>
+
+      <div class="two-col">
+        <div class="sub-panel">
+          <h3>Inbound stream</h3>
+          <div id="inbound-list" class="inbound-list"></div>
+        </div>
+        <div class="sub-panel">
+          <h3>Do-Not-Contact list (app-side suppression)</h3>
+          <p class="sub">Separate from Twilio's Advanced Opt-Out block list. Enforces cross-sender suppression the RFP asks for. Attempting to send to a DNC'd number returns <code>21610</code>.</p>
+          <div id="dnc-list" class="dnc-list"></div>
+        </div>
       </div>
+    </section>
+
+    <!-- ────────── SCENE D ────────── -->
+    <section class="scene hidden" data-scene="d">
+      <div class="scene-head">
+        <div>
+          <div class="eyebrow">Scene D · talk-track</div>
+          <h2>Business-user self-service for campaign administration</h2>
+          <p>This scene is intentionally not interactive. It maps RFP use case 4 to Twilio Console self-service capabilities — honestly.</p>
+        </div>
+      </div>
+      <div class="two-col">
+        <div class="sub-panel">
+          <h3>Business users can self-serve for</h3>
+          <ul class="proof-list check">
+            <li><b>DNC / suppression list management</b> · Messaging &gt; Advanced Opt-Out</li>
+            <li><b>Opt-out confirmation wording</b> · custom Surge copy without redeploying code</li>
+            <li><b>Sender Pool / Messaging Service configuration</b> · add/remove numbers, rules</li>
+            <li><b>Scheduling adjustments &amp; pausing campaigns</b> · Bulk scheduling up to 7 days out</li>
+            <li><b>Delivery monitoring, alerts, reports</b> · Console + Insights + Event Streams</li>
+          </ul>
+        </div>
+        <div class="sub-panel warn">
+          <h3>Where we concede honestly</h3>
+          <p><b>Changing the SMS body copy itself still requires an application code change.</b> Twilio does not ship a business-user editor for SMS body text.</p>
+          <p>If Continental wants a business-user-facing content editor on top of Bulk Messaging, that's a scoped services engagement — separately quoted. We won't fake it in this demo.</p>
+          <p class="sub">For everything except message body copy, Console + IAM roles cover it.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ────────── RAW API (persistent) ────────── -->
+    <section class="raw-panel">
+      <details>
+        <summary><span class="eyebrow">Developer view</span> Raw API request &amp; response &middot; last Bulk send</summary>
+        <div class="raw-grid">
+          <div>
+            <div class="raw-label">Request &middot; POST https://comms.twilio.com/v1/Messages</div>
+            <pre id="raw-request">&mdash;</pre>
+          </div>
+          <div>
+            <div class="raw-label">Response</div>
+            <pre id="raw-response">&mdash;</pre>
+          </div>
+        </div>
+      </details>
     </section>
   </main>
 

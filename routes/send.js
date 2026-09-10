@@ -14,8 +14,19 @@ const REMINDER_TEMPLATE =
 router.post('/api/campaigns/send', async (req, res) => {
   try {
     const safeMode = process.env.SAFE_MODE === 'true';
+    const dnc = new Set(db.prepare(`SELECT phone FROM dnc`).all().map((r) => r.phone));
+
     const recipients = [];
-    if (!safeMode) recipients.push(customerRecipient());
+    if (!safeMode) {
+      const c = customerRecipient();
+      if (dnc.has(c.address)) {
+        return res.status(400).json({
+          error: `Customer ${c.address} is on the local DNC list. Remove them first, or use the DNC panel.`,
+          blockedByDnc: [c.address],
+        });
+      }
+      recipients.push(c);
+    }
 
     if (recipients.length === 0) {
       return res.status(400).json({
