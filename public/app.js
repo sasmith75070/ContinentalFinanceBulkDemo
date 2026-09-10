@@ -251,9 +251,9 @@ function renderQueue(queue) {
       advanceCoach('b', 2);
       logActivity({
         kind: 'server',
-        tag: 'Webhook',
-        tech: 'POST /webhooks/payment · Fiserv-shaped payload',
-        plain: `Simulating a Fiserv payment webhook for <b>${name}</b>. Payload: <code>{phone, accountId, amount, postedAt}</code>. Server marks the recipient as suppressed in SQLite.`,
+        tag: 'Payment webhook',
+        tech: 'POST /webhooks/payment',
+        plain: `Continental Finance's payment system posts a payment for <b>${name}</b>. Server suppresses that cardholder from today's queue.`,
       });
       try {
         await fetch('/webhooks/payment', {
@@ -261,7 +261,8 @@ function renderQueue(queue) {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             phone, accountId: 'ACCT-' + phone.slice(-4),
-            amount: '47.50', postedAt: new Date().toISOString(), source: 'fiserv-sim',
+            amount: '47.50', postedAt: new Date().toISOString(),
+            event: 'payment.posted',
           }),
         });
       } catch (err) {
@@ -282,7 +283,7 @@ $('queue-reset').addEventListener('click', async () => {
   logActivity({
     kind: 'server', tag: 'Server',
     tech: 'POST /api/queue/reset',
-    plain: 'Rebuilding today\'s pending queue in SQLite from the recipient fixture.',
+    plain: `Rebuilding today's Surge Mastercard reminder queue.`,
   });
   const res = await fetch('/api/queue/reset', { method: 'POST' });
   const data = await res.json();
@@ -297,7 +298,7 @@ $('queue-send').addEventListener('click', async () => {
   logActivity({
     kind: 'server', tag: 'Server',
     tech: 'POST /api/queue/send',
-    plain: 'Reading pending recipients from SQLite <i>right now</i> — the "list-right-before-send" mechanic — then calling the Bulk API with only what remains.',
+    plain: `Reading Continental Finance's pending cardholders <i>right now</i>, then calling the Bulk API with only what remains.`,
   });
   const started = performance.now();
   try {
@@ -318,7 +319,7 @@ $('queue-send').addEventListener('click', async () => {
       kind: 'bulk',
       tag: 'Bulk API',
       tech: 'POST https://comms.twilio.com/v1/Messages',
-      plain: `Twilio accepted <b>${data.recipientCount}</b> recipient(s). <b>${data.suppressedCount || 0}</b> suppressed by payment. <b>${(data.blockedByDnc || []).length}</b> filtered by DNC. Operation <code>${data.operationId || '—'}</code>.`,
+      plain: `Twilio accepted <b>${data.recipientCount}</b> cardholder(s). <b>${data.suppressedCount || 0}</b> suppressed by payment. <b>${(data.blockedByDnc || []).length}</b> filtered by DNC. Operation <code>${data.operationId || '—'}</code>.`,
       status: `${res.status} · ${ms}ms`, statusClass: 'ok',
       doc: { url: 'https://www.twilio.com/docs/bulk-messaging/api/message-resource', label: 'Docs · Bulk Messaging: Message resource' },
     });
@@ -462,7 +463,7 @@ es.onmessage = (e) => {
         });
         logActivity({
           kind: 'twilio-in', tag: 'Suppress',
-          plain: `Server confirmed <b>${evt.firstName || evt.phone}</b> was removed from today's queue before the Bulk send fires.`,
+          plain: `<b>${evt.firstName || evt.phone}</b> suppressed. Won't receive today's reminder.`,
         });
         break;
       }

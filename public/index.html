@@ -144,7 +144,7 @@
             <li><b>One API call, thousands of sends.</b> <code>POST /v1/Messages</code> accepts a <code>to[]</code> array of up to 10,000 recipients.</li>
             <li><b>Personalization is native.</b> Liquid variables (<code>{{firstName}}</code>, <code>{{amountDue}}</code>) resolve per-recipient with <code>default</code> filter fallbacks.</li>
             <li><b>Per-recipient status.</b> The Operations resource returns Delivered / Failed / Unaddressable counters that advance in real time.</li>
-            <li><b>Send window (8am–9pm ET).</b> Continental's own scheduler controls send time. Compliance Toolkit is Programmable Messaging only — we intentionally are not claiming it here.</li>
+            <li><b>Send window (8am–9pm ET).</b> Continental Finance's own scheduler controls send time. Compliance Toolkit is Programmable Messaging only — we are intentionally not claiming it here.</li>
           </ul>
         </div>
       </div>
@@ -156,7 +156,7 @@
         <div>
           <div class="eyebrow">Scene B</div>
           <h2>Suppress reminders the instant a payment posts</h2>
-          <p>Continental's current lag is ~15 minutes. With a Fiserv-shaped webhook + list-right-before-send, the lag becomes <b>zero</b>.</p>
+          <p>Continental Finance's current lag from payment to suppression is ~15 minutes. With a real-time payment-posted webhook, that lag becomes <b>zero</b>.</p>
         </div>
       </div>
 
@@ -164,16 +164,16 @@
         <div class="coach-step" data-step="1">
           <div class="coach-num">1</div>
           <div class="coach-text">
-            <b>Fiserv posts a payment</b>
-            <span>Click any row's "Payment posted" button. Simulates a payment webhook. Payload: <code>{phone, accountId, amount, postedAt, source}</code>.</span>
+            <b>A cardholder pays their bill</b>
+            <span>Click any row's "Payment posted" button. Continental Finance's payment system fires a webhook to our server.</span>
           </div>
         </div>
         <div class="coach-arrow">→</div>
         <div class="coach-step" data-step="2">
           <div class="coach-num">2</div>
           <div class="coach-text">
-            <b>Recipient removed from pending queue</b>
-            <span>Our server marks the row <code>suppressed</code> in SQLite before the send fires. This is the "list-right-before-send" mechanic.</span>
+            <b>That cardholder is suppressed</b>
+            <span>Server removes them from today's queue. The list is re-read at the moment of send — not at scheduling time.</span>
           </div>
         </div>
         <div class="coach-arrow">→</div>
@@ -181,7 +181,7 @@
           <div class="coach-num">3</div>
           <div class="coach-text">
             <b>Send today's 10am reminder</b>
-            <span>Bulk API call goes out with only the pending rows. The suppressed customer gets no message.</span>
+            <span>Bulk API fires with only pending cardholders. The paid cardholder gets no message.</span>
           </div>
         </div>
       </div>
@@ -296,7 +296,7 @@
         <div class="sub-panel warn">
           <h3>Where we concede honestly</h3>
           <p><b>Changing the SMS body copy itself still requires an application code change.</b> Twilio does not ship a business-user editor for SMS body text.</p>
-          <p>If Continental wants a business-user-facing content editor on top of Bulk Messaging, that is a scoped services engagement — separately quoted. We won't fake it in this demo.</p>
+          <p>If Continental Finance wants a business-user-facing content editor on top of Bulk Messaging, that is a scoped services engagement — separately quoted. We won't fake it in this demo.</p>
           <p class="sub">For everything except message body copy, Console + IAM roles cover it.</p>
         </div>
       </div>
