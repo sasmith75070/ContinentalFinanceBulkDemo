@@ -1,20 +1,15 @@
 const { Router } = require('express');
-const { client } = require('../lib/twilio');
-const { defaultQueue } = require('../lib/recipients');
+const { sendBulk } = require('../lib/bulk');
+const { buildRecipient, defaultQueue } = require('../lib/recipients');
 const { db } = require('../lib/state');
 const { publish } = require('./stream');
 
 const router = Router();
 
-// Reminder body used for scheduled sends. Not a Liquid template — Programmable
-// Messaging (which is what backs schedule + cancel) does not run Liquid;
-// personalization is done in JS before the API call.
-const REMINDER_BODY = (r) =>
-  `Hi ${r.firstName}, this is a reminder that your Surge Mastercard ending in ${r.lastFour} has a payment of ${r.amountDue} due on ${r.dueDate}. Reply STOP to opt out.`;
-
-// One-time-per-boot schema extension for the schedule/cancel flow.
-try { db.exec(`ALTER TABLE queue ADD COLUMN message_sid TEXT`); } catch {}
-try { db.exec(`ALTER TABLE queue ADD COLUMN send_at TEXT`); } catch {}
+// Liquid template used on the Bulk send. `default` filter on every variable —
+// Twilio's Liquid parser rejects JSON-escaped double quotes, so single quotes inside.
+const REMINDER_TEMPLATE =
+  "Hi {{firstName | default: 'Customer'}}, this is a reminder that your Surge Mastercard ending in {{lastFour | default: '0000'}} has a payment of {{amountDue | default: 'your balance'}} due on {{dueDate | default: 'soon'}}. Reply STOP to opt out.";
 
 function readQueue() {
   return db.prepare(`SELECT * FROM queue ORDER BY is_customer DESC, phone ASC`).all().map((r) => ({
@@ -25,8 +20,7 @@ function readQueue() {
     amountDue: r.amount_due,
     isCustomer: !!r.is_customer,
     status: r.status,
-    messageSid: r.message_sid,
-    sendAt: r.send_at,
+    suppressedReason: r.suppressed_reason,
   }));
 }
 
@@ -55,128 +49,118 @@ router.post('/api/queue/reset', (req, res) => {
   res.json({ queue });
 });
 
-// Schedule the reminder for Continental Finance's real cardholder (the presenter's cell).
-// Programmable Messaging: POST /2010-04-01/Accounts/{Sid}/Messages.json
-//   scheduleType = 'fixed'
-//   sendAt = now + 20 min (Twilio minimum lead time is 15 min)
-//   messagingServiceSid = required (cancellation is only supported with a Messaging Service)
-// https://www.twilio.com/docs/messaging/features/message-scheduling
-router.post('/api/queue/schedule', async (req, res) => {
-  try {
-    if (!process.env.TWILIO_MESSAGING_SERVICE_SID) {
-      return res.status(500).json({ error: 'TWILIO_MESSAGING_SERVICE_SID not set in env' });
-    }
-    const customerPhone = process.env.CUSTOMER_PHONE;
-    const row = db.prepare(`SELECT * FROM queue WHERE phone = ?`).get(customerPhone);
-    if (!row) {
-      return res.status(404).json({ error: `${customerPhone} not in queue. Reset the queue first.` });
-    }
-
-    const sendAt = new Date(Date.now() + 20 * 60 * 1000).toISOString();
-    const body = REMINDER_BODY({
-      firstName: row.first_name,
-      lastFour: row.last_four,
-      dueDate: row.due_date,
-      amountDue: row.amount_due,
-    });
-
-    const request = {
-      messagingServiceSid: process.env.TWILIO_MESSAGING_SERVICE_SID,
-      to: customerPhone,
-      body,
-      scheduleType: 'fixed',
-      sendAt,
-    };
-
-    const message = await client().messages.create(request);
-
-    db.prepare(
-      `UPDATE queue SET status = ?, message_sid = ?, send_at = ?, updated_at = datetime('now')
-       WHERE phone = ?`
-    ).run(message.status, message.sid, sendAt, customerPhone);
-
-    publish({
-      type: 'queue.scheduled',
-      phone: customerPhone,
-      firstName: row.first_name,
-      messageSid: message.sid,
-      status: message.status,
-      sendAt,
-      request,
-      response: { sid: message.sid, status: message.status, dateCreated: message.dateCreated },
-      at: new Date().toISOString(),
-    });
-
-    res.json({
-      phone: customerPhone,
-      firstName: row.first_name,
-      messageSid: message.sid,
-      status: message.status,
-      sendAt,
-      request,
-    });
-  } catch (err) {
-    console.error('[queue/schedule] error:', err);
-    res.status(500).json({ error: err.message, code: err.code, moreInfo: err.moreInfo });
-  }
-});
-
-// Payment webhook: look up the MessageSid stored on this cardholder's row and
-// cancel via Update Message. Cancellation is only available while the message
-// is still in `scheduled` status; Twilio moves it to `queued` ~15 min before
-// sendAt, at which point Twilio returns error 30409.
-// https://www.twilio.com/docs/api/errors/30409
-router.post('/webhooks/payment', async (req, res) => {
+// Payment webhook. Shape mirrors what Continental Finance's payment system
+// (Fiserv → their DBA-managed process) would produce. Marks the cardholder
+// as suppressed in the pending queue. NO Twilio API call in this step —
+// the suppression lives entirely in Continental Finance's data layer until
+// the next Bulk send fires.
+router.post('/webhooks/payment', (req, res) => {
   const phone = (req.body && req.body.phone) || '';
   if (!phone) return res.status(400).json({ error: 'phone required' });
 
-  const row = db.prepare(`SELECT * FROM queue WHERE phone = ?`).get(phone);
-  if (!row) return res.status(404).json({ error: 'phone not in current queue' });
+  const before = db.prepare(`SELECT status, first_name FROM queue WHERE phone = ?`).get(phone);
+  if (!before) return res.status(404).json({ error: 'phone not in current queue' });
 
+  db.prepare(
+    `UPDATE queue SET status = 'suppressed', suppressed_reason = 'payment_posted', updated_at = datetime('now')
+     WHERE phone = ?`
+  ).run(phone);
+
+  publish({
+    type: 'queue.suppressed',
+    phone,
+    firstName: before.first_name,
+    reason: 'payment_posted',
+    payload: req.body || {},
+    at: new Date().toISOString(),
+  });
+  res.json({ ok: true, phone, firstName: before.first_name });
+});
+
+// Send today's reminder. Reads the pending queue AT THIS MOMENT, filters out
+// cardholders on the app-side DNC, and calls the Bulk Messaging API with only
+// the remaining recipients. This is the "list-right-before-send" mechanic —
+// payment webhooks that arrive between scheduling and send time all take effect.
+router.post('/api/queue/send', async (req, res) => {
   try {
-    let canceledSid = null;
-    let newStatus = 'suppressed';
-    let twilioResponse = null;
+    const safeMode = process.env.SAFE_MODE === 'true';
+    const customerPhone = process.env.CUSTOMER_PHONE;
 
-    if (row.message_sid) {
-      const updated = await client().messages(row.message_sid).update({ status: 'canceled' });
-      canceledSid = row.message_sid;
-      newStatus = updated.status;
-      twilioResponse = { sid: updated.sid, status: updated.status, dateUpdated: updated.dateUpdated };
+    const pending = readQueue().filter((r) => r.status === 'pending');
+    if (pending.length === 0) {
+      return res.status(400).json({ error: 'Queue is empty. Reset the queue first.' });
     }
 
+    const dnc = new Set(db.prepare(`SELECT phone FROM dnc`).all().map((r) => r.phone));
+    const safeExcluded = safeMode && customerPhone
+      ? pending.filter((r) => r.phone === customerPhone).map((r) => r.phone)
+      : [];
+    const finalList = pending.filter((r) =>
+      !dnc.has(r.phone) && !safeExcluded.includes(r.phone)
+    );
+    const blocked = pending.filter((r) => dnc.has(r.phone));
+
+    const to = finalList.map((r) =>
+      buildRecipient({
+        phone: r.phone,
+        variables: {
+          firstName: r.firstName,
+          lastFour: r.lastFour,
+          dueDate: r.dueDate,
+          amountDue: r.amountDue,
+        },
+      })
+    );
+
+    const body = {
+      from: { address: process.env.TWILIO_FROM_LONGCODE, channel: 'SMS' },
+      to,
+      content: { text: REMINDER_TEMPLATE },
+    };
+
+    const info = db
+      .prepare(`INSERT INTO campaigns (name, payload_json) VALUES (?, ?)`)
+      .run('surge-10am-reminder', JSON.stringify(body));
+    const campaignId = info.lastInsertRowid;
+
+    const result = await sendBulk(body);
+
     db.prepare(
-      `UPDATE queue SET status = ?, updated_at = datetime('now') WHERE phone = ?`
-    ).run(newStatus, phone);
+      `UPDATE campaigns SET operation_id = ?, status = ?, response_json = ? WHERE id = ?`
+    ).run(
+      result.operationId || null,
+      result.ok ? 'submitted' : 'error',
+      JSON.stringify({ status: result.status, body: result.body, headers: result.headers }),
+      campaignId
+    );
 
     publish({
-      type: 'queue.canceled',
-      phone,
-      firstName: row.first_name,
-      messageSid: canceledSid,
-      status: newStatus,
-      payload: req.body || {},
-      response: twilioResponse,
-      at: new Date().toISOString(),
+      type: 'campaign.submitted',
+      campaignId,
+      operationId: result.operationId,
+      status: result.status,
+      recipientCount: to.length,
+      suppressed: pending.length - finalList.length,
+      blockedByDnc: blocked.map((r) => r.phone),
+      safeModeExcluded: safeExcluded,
+      request: body,
+      response: { status: result.status, body: result.body, headers: result.headers },
     });
 
-    res.json({
-      ok: true,
-      phone,
-      firstName: row.first_name,
-      messageSid: canceledSid,
-      status: newStatus,
-      response: twilioResponse,
+    res.status(result.status).json({
+      campaignId,
+      operationId: result.operationId,
+      status: result.status,
+      recipientCount: to.length,
+      suppressedCount: pending.length - finalList.length,
+      blockedByDnc: blocked.map((r) => r.phone),
+      safeModeExcluded: safeExcluded,
+      request: body,
+      response: result.body,
     });
   } catch (err) {
-    console.error('[payment cancel] error:', err);
-    res.status(400).json({
-      error: err.message,
-      code: err.code,
-      hint: err.code === 30409
-        ? 'Twilio has already moved this message out of scheduled status (typically ~15 min before sendAt). Cancellation is no longer available.'
-        : undefined,
-    });
+    console.error('[queue/send] error:', err);
+    res.status(500).json({ error: err.message });
   }
 });
 

@@ -418,6 +418,17 @@ main { padding: 20px 28px 40px; }
   background: rgba(244,63,94,0.08);
   border-color: var(--surge-red-2);
 }
+.products-note {
+  margin-top: 10px;
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.5;
+  font-style: italic;
+  padding: 8px 12px;
+  background: rgba(255,255,255,0.02);
+  border-radius: 6px;
+}
+.products-note b { color: var(--text); font-style: normal; }
 
 /* ---------- Honest-note callout under coach ---------- */
 .flow-note {

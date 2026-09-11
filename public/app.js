@@ -224,12 +224,9 @@ $('schedule-btn').addEventListener('click', () => fireCampaign({
   buttonId: 'schedule-btn',
 }));
 
-// ────────── Scene B — schedule + cancel ──────────
+// ────────── Scene B — payment-triggered suppression + list-right-before-send ──────────
 const queueTableBody = document.querySelector('#queue-table tbody');
 const timelineEl = $('timeline');
-const consoleLinkEl = $('console-link');
-let customerPhoneClient = null;         // Jane's phone, discovered from /api/queue
-let scheduledMessageSidClient = null;   // last MessageSid scheduled
 
 function fmtTime(iso) {
   const d = iso ? new Date(iso) : new Date();
@@ -242,31 +239,55 @@ function addTimeline({ label, detail, kind, at }) {
   timelineEl.prepend(li);
 }
 
-function statusBadge(status) {
-  if (status === 'scheduled') return '<span class="badge scheduled">Scheduled</span>';
-  if (status === 'canceled')  return '<span class="badge canceled">Canceled</span>';
-  if (status === 'suppressed') return '<span class="badge suppressed">Suppressed</span>';
-  return '<span class="badge pending">Pending</span>';
-}
-
 function renderQueue(queue) {
   queueTableBody.innerHTML = '';
   for (const r of queue) {
-    if (r.isCustomer) customerPhoneClient = r.phone;
     const tr = document.createElement('tr');
     if (r.isCustomer) tr.classList.add('customer-row');
-    if (r.status === 'canceled' || r.status === 'suppressed') tr.classList.add('suppressed');
-    const sidCell = r.messageSid
-      ? `<code>${r.messageSid}</code>`
-      : (r.isCustomer ? '<span class="sub">not scheduled yet</span>' : '<span class="sub">—</span>');
+    if (r.status !== 'pending') tr.classList.add('suppressed');
+    const badge = r.status === 'pending'
+      ? '<span class="badge pending">Pending</span>'
+      : '<span class="badge suppressed">Suppressed</span>';
     tr.innerHTML = `
       <td>${r.firstName || '—'}${r.isCustomer ? '<span class="badge customer">Real</span>' : ''}</td>
       <td>&bull;&bull;&bull;&bull; ${r.lastFour || '—'}</td>
+      <td>${r.dueDate || '—'}</td>
       <td>${r.amountDue || '—'}</td>
-      <td class="mono">${sidCell}</td>
-      <td>${statusBadge(r.status)}</td>`;
+      <td>${badge}</td>
+      <td>${r.status === 'pending'
+        ? `<button class="btn small ghost pay-btn" data-phone="${r.phone}" data-name="${r.firstName || ''}">Payment posted</button>`
+        : ''}</td>`;
     queueTableBody.appendChild(tr);
   }
+  queueTableBody.querySelectorAll('.pay-btn').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      btn.disabled = true;
+      const phone = btn.dataset.phone;
+      const name = btn.dataset.name;
+      advanceCoach('b', 2);
+      logActivity({
+        scene: 'b',
+        kind: 'server', tag: 'Payment webhook',
+        tech: 'POST /webhooks/payment',
+        plain: `Continental Finance's payment system posts a payment for <b>${name}</b>. Server suppresses that cardholder from today's queue — no Twilio call.`,
+      });
+      try {
+        await fetch('/webhooks/payment', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            phone,
+            accountId: 'ACCT-' + phone.slice(-4),
+            amount: '47.50',
+            postedAt: new Date().toISOString(),
+            event: 'payment.posted',
+          }),
+        });
+      } catch (err) {
+        logActivity({ scene: 'b', kind: 'local', tag: 'Error', plain: `Payment sim failed: ${err.message}`, statusClass: 'err' });
+      }
+    });
+  });
 }
 
 async function loadQueue() {
@@ -275,22 +296,8 @@ async function loadQueue() {
   renderQueue(data.queue || []);
 }
 
-function setConsoleLink(sid) {
-  if (!sid) {
-    consoleLinkEl.innerHTML = '<span class="sub">Schedule a message to reveal its Console link.</span>';
-    return;
-  }
-  const url = `https://console.twilio.com/us1/monitor/logs/sms?frameUrl=/console/sms/logs/${sid}`;
-  consoleLinkEl.innerHTML = `
-    <a href="${url}" target="_blank" rel="noreferrer">Open ${sid} in Twilio Console ↗</a>
-    <span class="console-hint">Console → Monitor → Logs → Messaging. Refresh the log to watch the status flip live.</span>`;
-}
-
 $('queue-reset').addEventListener('click', async () => {
   advanceCoach('b', 1);
-  scheduledMessageSidClient = null;
-  $('queue-cancel').disabled = true;
-  setConsoleLink(null);
   logActivity({
     scene: 'b',
     kind: 'server', tag: 'Server',
@@ -303,110 +310,47 @@ $('queue-reset').addEventListener('click', async () => {
   addTimeline({ label: 'Queue reset', detail: `${(data.queue || []).length} rows loaded`, kind: '' });
 });
 
-$('queue-schedule').addEventListener('click', async () => {
-  const btn = $('queue-schedule');
+$('queue-send').addEventListener('click', async () => {
+  const btn = $('queue-send');
   btn.disabled = true;
-  advanceCoach('b', 1);
+  advanceCoach('b', 3);
   logActivity({
     scene: 'b',
     kind: 'server', tag: 'Server',
-    tech: 'POST /api/queue/schedule',
-    plain: `Dashboard asks the server to schedule Jane's Surge reminder 20 minutes from now.`,
+    tech: 'POST /api/queue/send',
+    plain: `Server reads the pending queue <i>right now</i>, filters DNC, then POSTs the surviving list to Twilio Bulk.`,
   });
   const started = performance.now();
   try {
-    const res = await fetch('/api/queue/schedule', { method: 'POST' });
+    const res = await fetch('/api/queue/send', { method: 'POST' });
     const data = await res.json();
     const ms = Math.round(performance.now() - started);
     if (!res.ok) {
-      logActivity({ scene: 'b', kind: 'local', tag: 'Error', tech: `HTTP ${res.status}`, plain: data.error || 'Schedule failed', status: `${res.status} · ${ms}ms`, statusClass: 'err' });
-      addTimeline({ label: 'Schedule failed', detail: data.error || `HTTP ${res.status}`, kind: 'suppress' });
+      addTimeline({ label: 'Send failed', detail: data.error || `HTTP ${res.status}`, kind: 'suppress' });
+      logActivity({ scene: 'b', kind: 'local', tag: 'Error', tech: `HTTP ${res.status}`, plain: data.error || 'Send failed', status: `${res.status} · ${ms}ms`, statusClass: 'err' });
       return;
     }
-    scheduledMessageSidClient = data.messageSid;
     setRaw(
       data.request,
-      { sid: data.messageSid, status: data.status, sendAt: data.sendAt, dateCreated: data.dateCreated },
-      'POST https://api.twilio.com/2010-04-01/Accounts/{Sid}/Messages.json · Programmable Messaging'
+      { status: res.status, body: data.response, operationId: data.operationId, recipientCount: data.recipientCount, suppressedCount: data.suppressedCount },
+      'POST https://comms.twilio.com/v1/Messages · Bulk API'
     );
+    addTimeline({
+      label: 'Send fired',
+      detail: `${data.recipientCount} sent · ${data.suppressedCount || 0} suppressed · op ${data.operationId || '—'}`,
+      kind: 'send',
+    });
     logActivity({
       scene: 'b',
-      kind: 'bulk', tag: 'Twilio API',
-      tech: 'POST https://api.twilio.com/2010-04-01/Accounts/{Sid}/Messages.json',
-      plain: `Twilio Programmable Messaging accepted the scheduled send.<br>
-              MessageSid: <code>${data.messageSid}</code><br>
-              Status: <b><code>${data.status}</code></b><br>
-              sendAt: <code>${data.sendAt}</code><br>
-              This message is now on Twilio's schedule. Cancel is available until Twilio moves it to <code>queued</code> (~15 min before sendAt).`,
+      kind: 'bulk', tag: 'Bulk API',
+      tech: 'POST https://comms.twilio.com/v1/Messages',
+      plain: `Twilio accepted <b>${data.recipientCount}</b> cardholder(s). <b>${data.suppressedCount || 0}</b> excluded because their payment posted before send. <b>${(data.blockedByDnc || []).length}</b> filtered by DNC. Operation <code>${data.operationId || '—'}</code>.`,
       status: `${res.status} · ${ms}ms`, statusClass: 'ok',
-      doc: { url: 'https://www.twilio.com/docs/messaging/features/message-scheduling', label: 'Docs · Message Scheduling' },
+      doc: { url: 'https://www.twilio.com/docs/bulk-messaging', label: 'Docs · Bulk Messaging' },
     });
-    addTimeline({ label: 'Scheduled', detail: `${data.messageSid} · fires ${new Date(data.sendAt).toLocaleTimeString()}`, kind: 'send' });
-    setConsoleLink(data.messageSid);
-    $('queue-cancel').disabled = false;
-    advanceCoach('b', 2);
-    loadQueue();
+    if (data.operationId) primeOperation(data.operationId, data.recipientCount);
   } finally {
     btn.disabled = false;
-  }
-});
-
-$('queue-cancel').addEventListener('click', async () => {
-  const btn = $('queue-cancel');
-  if (!customerPhoneClient) { logActivity({ scene: 'b', kind: 'local', tag: 'Error', plain: 'No customer phone in queue.' }); return; }
-  btn.disabled = true;
-  advanceCoach('b', 2);
-  logActivity({
-    scene: 'b',
-    kind: 'server', tag: 'Payment webhook',
-    tech: 'POST /webhooks/payment',
-    plain: `Continental Finance's payment system posts a payment for Jane. Server looks up her MessageSid.`,
-  });
-  const started = performance.now();
-  try {
-    const res = await fetch('/webhooks/payment', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        phone: customerPhoneClient,
-        accountId: 'ACCT-' + customerPhoneClient.slice(-4),
-        amount: '47.50',
-        postedAt: new Date().toISOString(),
-        event: 'payment.posted',
-      }),
-    });
-    const data = await res.json();
-    const ms = Math.round(performance.now() - started);
-    if (!res.ok) {
-      const hint = data.hint ? `<br><i>${data.hint}</i>` : '';
-      logActivity({
-        scene: 'b',
-        kind: 'local', tag: 'Cancel failed',
-        tech: `HTTP ${res.status} · code ${data.code || '—'}`,
-        plain: `${data.error || 'Cancel failed'}${hint}`,
-        status: `${res.status} · ${ms}ms`, statusClass: 'err',
-      });
-      return;
-    }
-    setRaw(
-      { messagesResource: `/2010-04-01/Accounts/{AccountSid}/Messages/${data.messageSid}.json`, method: 'POST', body: { Status: 'canceled' } },
-      data.response || { sid: data.messageSid, status: data.status },
-      `POST https://api.twilio.com/2010-04-01/Accounts/{Sid}/Messages/${data.messageSid}.json · Update Message`
-    );
-    logActivity({
-      scene: 'b',
-      kind: 'bulk', tag: 'Twilio API',
-      tech: `POST https://api.twilio.com/2010-04-01/Accounts/{Sid}/Messages/${data.messageSid}.json · Status=canceled`,
-      plain: `Twilio flipped the message status.<br>
-              MessageSid: <code>${data.messageSid}</code><br>
-              Status: <b><code>${data.status}</code></b><br>
-              The scheduled SMS will never be delivered. Verify in the Twilio Console.`,
-      status: `${res.status} · ${ms}ms`, statusClass: 'ok',
-      doc: { url: 'https://www.twilio.com/docs/api/errors/30409', label: 'Docs · Cancellation rules' },
-    });
-    advanceCoach('b', 3);
-  } finally {
-    // leave button disabled after successful cancel to prevent double-clicks
   }
 });
 
@@ -534,21 +478,17 @@ es.onmessage = (e) => {
         renderQueue(evt.queue || []);
         break;
       }
-      case 'queue.scheduled': {
+      case 'queue.suppressed': {
         loadQueue();
         addTimeline({
-          label: 'Scheduled',
-          detail: `${evt.messageSid} for ${evt.firstName || evt.phone}`,
-          kind: 'send', at: evt.at,
-        });
-        break;
-      }
-      case 'queue.canceled': {
-        loadQueue();
-        addTimeline({
-          label: 'Payment posted → canceled',
-          detail: `${evt.messageSid || evt.phone} · status = ${evt.status}`,
+          label: 'Payment posted → suppressed',
+          detail: `${evt.firstName || evt.phone} removed from pending queue`,
           kind: 'suppress', at: evt.at,
+        });
+        logActivity({
+          scene: 'b',
+          kind: 'twilio-in', tag: 'Suppress',
+          plain: `<b>${evt.firstName || evt.phone}</b> now marked suppressed. Won't be in the next Bulk send payload.`,
         });
         break;
       }
