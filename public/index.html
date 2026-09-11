@@ -50,28 +50,23 @@
         <ul class="product-list">
           <li>
             <div class="product-title"><b>Bulk Messaging API</b> · <code>POST /v1/Messages</code></div>
-            <div class="product-desc">One request accepts up to 10,000 recipients with per-recipient Liquid variables. Returns <code>operationId</code>.</div>
+            <div class="product-desc">Actively invoked by the Send now button. One request accepts up to 10,000 recipients. Returns HTTP 202 + <code>operationId</code>.</div>
             <a href="https://www.twilio.com/docs/bulk-messaging" target="_blank" rel="noreferrer">Docs ↗</a>
           </li>
           <li>
             <div class="product-title"><b>Bulk Operations Resource</b> · <code>GET /v1/Messages/Operations/{id}</code></div>
-            <div class="product-desc">Poll per-recipient status: total / delivered / failed / unaddressable.</div>
+            <div class="product-desc">Polled every 750ms after each send. Feeds the delivered / failed / unaddressable counters.</div>
             <a href="https://www.twilio.com/docs/bulk-messaging" target="_blank" rel="noreferrer">Docs ↗</a>
           </li>
           <li>
-            <div class="product-title"><b>Message Scheduling</b> · <code>schedule.sendAt</code> (Bulk)</div>
-            <div class="product-desc">Up to 7 days out. Omit the timezone and Twilio auto-localizes to each cardholder's timezone.</div>
+            <div class="product-title"><b>Scheduled sends</b> · <code>schedule.sendAt</code></div>
+            <div class="product-desc">Actively invoked by the Schedule button. Up to 7 days out; omitting the timezone lets Twilio auto-localize to each cardholder's timezone.</div>
             <a href="https://www.twilio.com/docs/bulk-messaging/scheduling" target="_blank" rel="noreferrer">Docs ↗</a>
           </li>
           <li>
-            <div class="product-title"><b>Rich Content</b> · <code>channels.priority</code> + Content Templates</div>
-            <div class="product-desc">RCS card or MMS via Content SID, with automatic SMS fallback for devices that can't render.</div>
-            <a href="https://www.twilio.com/docs/bulk-messaging/rich-content" target="_blank" rel="noreferrer">Docs ↗</a>
-          </li>
-          <li>
-            <div class="product-title"><b>Messaging Service</b></div>
-            <div class="product-desc">Sender pool that owns the long code, opt-out configuration, and delivery routing.</div>
-            <a href="https://www.twilio.com/docs/messaging/services" target="_blank" rel="noreferrer">Docs ↗</a>
+            <div class="product-title"><b>Liquid variable substitution</b></div>
+            <div class="product-desc">Actively used in the reminder template — <code>{{firstName | default: 'Customer'}}</code>, etc. Every recipient in the same call gets their own values.</div>
+            <a href="https://www.twilio.com/docs/bulk-messaging" target="_blank" rel="noreferrer">Docs ↗</a>
           </li>
         </ul>
       </div>
@@ -205,27 +200,22 @@
         <ul class="product-list">
           <li>
             <div class="product-title"><b>Programmable Messaging · Create Message</b> · <code>POST /2010-04-01/Accounts/{Sid}/Messages.json</code></div>
-            <div class="product-desc">Create the scheduled SMS with <code>scheduleType=fixed</code>, <code>sendAt</code>, and a Messaging Service SID. Returns a MessageSid + <code>status=scheduled</code>.</div>
+            <div class="product-desc">Actively invoked by the Schedule button with <code>scheduleType=fixed</code>, <code>sendAt=+20min</code>, and the Messaging Service SID. Returns a MessageSid and <code>status=scheduled</code>.</div>
             <a href="https://www.twilio.com/docs/messaging/api/message-resource" target="_blank" rel="noreferrer">Docs ↗</a>
           </li>
           <li>
             <div class="product-title"><b>Message Scheduling</b> · <code>scheduleType=fixed</code> + <code>sendAt</code></div>
-            <div class="product-desc">Requires a Messaging Service. Fires at the exact sendAt. Cancellable while still <code>scheduled</code>.</div>
+            <div class="product-desc">Requires a Messaging Service. Fires at the exact sendAt. Cancellable while still in <code>scheduled</code> state.</div>
             <a href="https://www.twilio.com/docs/messaging/features/message-scheduling" target="_blank" rel="noreferrer">Docs ↗</a>
           </li>
           <li>
             <div class="product-title"><b>Programmable Messaging · Update Message</b> · <code>POST /Messages/{Sid}.json</code> with <code>Status=canceled</code></div>
-            <div class="product-desc">Flips a scheduled message's status. Twilio drops the message before handing off to the carrier.</div>
+            <div class="product-desc">Actively invoked by the Payment-posted button. Flips the scheduled message's status; Twilio drops it before it reaches the carrier.</div>
             <a href="https://www.twilio.com/docs/messaging/api/message-resource" target="_blank" rel="noreferrer">Docs ↗</a>
           </li>
           <li>
-            <div class="product-title"><b>Error 30409</b> — This message cannot be canceled</div>
-            <div class="product-desc">Returned when a message has left <code>scheduled</code> (moves to <code>queued</code> ~15 min before sendAt). Defines the cancellation window.</div>
-            <a href="https://www.twilio.com/docs/api/errors/30409" target="_blank" rel="noreferrer">Docs ↗</a>
-          </li>
-          <li>
             <div class="product-title"><b>Messaging Service</b></div>
-            <div class="product-desc">Required for scheduled messages. Owns the sender pool the scheduled SMS will fire from.</div>
+            <div class="product-desc">Referenced in every schedule call. Required for both message scheduling and cancellation. Owns the sender pool the SMS fires from.</div>
             <a href="https://www.twilio.com/docs/messaging/services" target="_blank" rel="noreferrer">Docs ↗</a>
           </li>
         </ul>
@@ -335,22 +325,17 @@
         <ul class="product-list">
           <li>
             <div class="product-title"><b>Advanced Opt-Out</b> · Messaging Service feature</div>
-            <div class="product-desc">Twilio auto-replies to STOP / START / HELP with custom Surge copy, updates the block list, and POSTs to your webhook with <code>OptOutType</code> for audit. Zero code.</div>
+            <div class="product-desc">Actively demonstrated. Twilio auto-replies to STOP / START / HELP with custom Surge copy, updates its block list, and POSTs the event to our webhook with an <code>OptOutType</code> header for audit. No code.</div>
             <a href="https://www.twilio.com/docs/messaging/tutorials/advanced-opt-out" target="_blank" rel="noreferrer">Docs ↗</a>
           </li>
           <li>
             <div class="product-title"><b>Inbound Webhook</b> · <code>POST /webhooks/twilio/inbound</code></div>
-            <div class="product-desc">Every inbound SMS is delivered to your webhook — keyword-matched and free-form both. Free-form lands in the Ops Review Queue for a human.</div>
+            <div class="product-desc">Actively receives every inbound SMS — keyword-matched and free-form both. Free-form lands in the Ops Review Queue for a human.</div>
             <a href="https://www.twilio.com/docs/messaging/tutorials/how-to-receive-and-reply" target="_blank" rel="noreferrer">Docs ↗</a>
           </li>
           <li>
-            <div class="product-title"><b>Error 21610</b> — Attempt to send to unsubscribed recipient</div>
-            <div class="product-desc">Returned when Continental Finance tries to send to a number on Twilio's opt-out block list. Enforced at Twilio's edge.</div>
-            <a href="https://www.twilio.com/docs/api/errors/21610" target="_blank" rel="noreferrer">Docs ↗</a>
-          </li>
-          <li>
             <div class="product-title"><b>Messaging Service</b></div>
-            <div class="product-desc">Owns the Advanced Opt-Out configuration, sender pool, and inbound webhook URL. Console-managed.</div>
+            <div class="product-desc">Owns the Advanced Opt-Out configuration, the sender pool, and the inbound webhook URL. Console-managed.</div>
             <a href="https://www.twilio.com/docs/messaging/services" target="_blank" rel="noreferrer">Docs ↗</a>
           </li>
         </ul>
