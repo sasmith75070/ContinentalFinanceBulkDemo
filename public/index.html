@@ -20,12 +20,12 @@
     <button class="scene-tab active" data-scene="a">
       <span class="tab-num">1</span>
       <span class="tab-title">Payment Reminder</span>
-      <span class="tab-sub">Bulk send &amp; schedule</span>
+      <span class="tab-sub">Create Message · immediate + scheduled</span>
     </button>
     <button class="scene-tab" data-scene="b">
       <span class="tab-num">2</span>
-      <span class="tab-title">Payment Suppression</span>
-      <span class="tab-sub">List-right-before-send · Bulk</span>
+      <span class="tab-title">Message Pull-back</span>
+      <span class="tab-sub">Schedule + cancel · payment-triggered</span>
     </button>
     <button class="scene-tab" data-scene="c">
       <span class="tab-num">3</span>
@@ -49,24 +49,24 @@
         <div class="eyebrow">Twilio Products used</div>
         <ul class="product-list">
           <li>
-            <div class="product-title"><b>Bulk Messaging API</b> · <code>POST /v1/Messages</code></div>
-            <div class="product-desc">Actively invoked by the Send now button. One request accepts up to 10,000 recipients. Returns HTTP 202 + <code>operationId</code>.</div>
-            <a href="https://www.twilio.com/docs/bulk-messaging" target="_blank" rel="noreferrer">Docs ↗</a>
+            <div class="product-title"><b>Programmable Messaging · Create Message</b> · <code>POST /2010-04-01/Accounts/{Sid}/Messages.json</code></div>
+            <div class="product-desc">Actively invoked by both buttons below. Server calls <code>client.messages.create()</code> with the Messaging Service SID, the recipient's number, and the personalized body. Returns a <code>MessageSid</code> and an initial <code>status</code>.</div>
+            <a href="https://www.twilio.com/docs/messaging/api/message-resource" target="_blank" rel="noreferrer">Docs ↗</a>
           </li>
           <li>
-            <div class="product-title"><b>Bulk Operations Resource</b> · <code>GET /v1/Messages/Operations/{id}</code></div>
-            <div class="product-desc">Polled every 750ms after each send. Feeds the delivered / failed / unaddressable counters.</div>
-            <a href="https://www.twilio.com/docs/bulk-messaging" target="_blank" rel="noreferrer">Docs ↗</a>
+            <div class="product-title"><b>Fetch Message</b> · <code>GET /Messages/{Sid}.json</code></div>
+            <div class="product-desc">Polled every 750ms after each send to update the status card as the message transitions <code>queued</code> → <code>sending</code> → <code>sent</code> → <code>delivered</code>.</div>
+            <a href="https://www.twilio.com/docs/messaging/api/message-resource" target="_blank" rel="noreferrer">Docs ↗</a>
           </li>
           <li>
-            <div class="product-title"><b>Scheduled sends</b> · <code>schedule.sendAt</code></div>
-            <div class="product-desc">Actively invoked by the Schedule button. Up to 7 days out; omitting the timezone lets Twilio auto-localize to each cardholder's timezone.</div>
-            <a href="https://www.twilio.com/docs/bulk-messaging/scheduling" target="_blank" rel="noreferrer">Docs ↗</a>
+            <div class="product-title"><b>Message Scheduling</b> · <code>scheduleType=fixed</code> + <code>sendAt</code></div>
+            <div class="product-desc">Actively invoked by the Schedule button. Requires a Messaging Service. Minimum 15 min lead, maximum 7 days out.</div>
+            <a href="https://www.twilio.com/docs/messaging/features/message-scheduling" target="_blank" rel="noreferrer">Docs ↗</a>
           </li>
           <li>
-            <div class="product-title"><b>Liquid variable substitution</b></div>
-            <div class="product-desc">Actively used in the reminder template — <code>{{firstName | default: 'Customer'}}</code>, etc. Every recipient in the same call gets their own values.</div>
-            <a href="https://www.twilio.com/docs/bulk-messaging" target="_blank" rel="noreferrer">Docs ↗</a>
+            <div class="product-title"><b>Messaging Service</b></div>
+            <div class="product-desc">Owns the sender pool (Continental Finance's short codes in production) plus Advanced Opt-Out. Referenced on every send.</div>
+            <a href="https://www.twilio.com/docs/messaging/services" target="_blank" rel="noreferrer">Docs ↗</a>
           </li>
         </ul>
       </div>
@@ -76,23 +76,23 @@
           <div class="coach-num">1</div>
           <div class="coach-text">
             <b>Click "Send now" or "Schedule"</b>
-            <span>The browser calls our server at <code>POST /api/campaigns/send</code>, which forwards to Twilio's Bulk API.</span>
+            <span>Browser calls our server at <code>POST /api/campaigns/send</code>. Server renders the personalized body and calls Programmable Messaging.</span>
           </div>
         </div>
         <div class="coach-arrow">→</div>
         <div class="coach-step" data-step="2">
           <div class="coach-num">2</div>
           <div class="coach-text">
-            <b>Watch the counters</b>
-            <span>Twilio returns <code>202 Accepted</code> + <code>operationId</code>. Our dashboard polls the Operations resource every 750ms.</span>
+            <b>Twilio returns a MessageSid</b>
+            <span>Twilio's <code>POST /Messages.json</code> returns a MessageSid and an initial status (<code>accepted</code> or <code>scheduled</code>). Dashboard polls <code>GET /Messages/{Sid}.json</code> every 750ms.</span>
           </div>
         </div>
         <div class="coach-arrow">→</div>
         <div class="coach-step" data-step="3">
           <div class="coach-num">3</div>
           <div class="coach-text">
-            <b>SMS lands on the cell</b>
-            <span>Real message. Real carrier. The customer thread mirrors what the recipient sees.</span>
+            <b>Status transitions live</b>
+            <span>Status card flips: <code>queued</code> → <code>sending</code> → <code>sent</code> → <code>delivered</code>. Real message on Jane's cell. Chat thread mirrors what she sees.</span>
           </div>
         </div>
       </div>
@@ -101,66 +101,61 @@
         <div class="btn-row">
           <button id="send-btn" class="btn primary large">
             <span class="btn-label">Send now</span>
-            <span class="btn-endpoint">POST <code>/v1/Messages</code> · immediate</span>
+            <span class="btn-endpoint">POST <code>/2010-04-01/…/Messages.json</code> · immediate</span>
           </button>
           <button id="schedule-btn" class="btn ghost large">
-            <span class="btn-label">Schedule for 10am tomorrow (per-cardholder local)</span>
-            <span class="btn-endpoint">POST <code>/v1/Messages</code> · <code>schedule.sendAt</code></span>
+            <span class="btn-label">Schedule for 10am tomorrow ET</span>
+            <span class="btn-endpoint">POST <code>/…/Messages.json</code> · <code>scheduleType=fixed</code></span>
           </button>
-        </div>
-        <div class="action-legend">
-          <div class="legend-item"><span class="dot green"></span> Delivered</div>
-          <div class="legend-item"><span class="dot amber"></span> Failed</div>
-          <div class="legend-item"><span class="dot muted"></span> Unaddressable</div>
         </div>
       </div>
 
       <div class="counters">
         <div class="stat">
-          <label>Operation ID</label>
+          <label>Message SID</label>
           <span id="op-id" class="stat-mono">&mdash;</span>
-          <div class="stat-hint">Returned by Twilio · used to poll status</div>
+          <div class="stat-hint">Twilio's identifier for this message</div>
         </div>
         <div class="stat">
           <label>HTTP</label>
           <span id="http-status">&mdash;</span>
-          <div class="stat-hint">202 = accepted for delivery</div>
+          <div class="stat-hint">201 = created</div>
         </div>
         <div class="stat">
-          <label>Total</label>
-          <span id="stat-total">&mdash;</span>
-          <div class="stat-hint">Recipients in this batch</div>
+          <label>Status</label>
+          <span id="stat-status">&mdash;</span>
+          <div class="stat-hint">queued → sending → sent → delivered</div>
+        </div>
+        <div class="stat">
+          <label>Segments</label>
+          <span id="stat-segments">&mdash;</span>
+          <div class="stat-hint">SMS segments (140-byte chunks)</div>
         </div>
         <div class="stat green">
-          <label>Delivered</label>
+          <label>Delivered at</label>
           <span id="stat-delivered">&mdash;</span>
-          <div class="stat-hint">Confirmed delivered</div>
+          <div class="stat-hint">Timestamp of delivery</div>
         </div>
         <div class="stat amber">
-          <label>Failed</label>
-          <span id="stat-failed">&mdash;</span>
-          <div class="stat-hint">Rejected by carrier</div>
-        </div>
-        <div class="stat muted">
-          <label>Unaddressable</label>
-          <span id="stat-unaddressable">&mdash;</span>
-          <div class="stat-hint">Number not routable</div>
+          <label>Error</label>
+          <span id="stat-error">&mdash;</span>
+          <div class="stat-hint">Twilio error code if any</div>
         </div>
       </div>
 
       <div class="two-col">
         <div class="sub-panel">
           <h3>Customer thread &middot; Jane · &bull;&bull;&bull;&bull; 4832</h3>
-          <p class="sub">What the cardholder sees. Personalized from Liquid template variables sent in the API call.</p>
+          <p class="sub">What the cardholder sees. Personalized server-side before the API call.</p>
           <div id="thread" class="thread"></div>
         </div>
         <div class="sub-panel">
           <h3>What this proves</h3>
           <ul class="proof-list">
-            <li><b>One API call, thousands of sends.</b> <code>POST /v1/Messages</code> accepts a <code>to[]</code> array of up to 10,000 recipients.</li>
-            <li><b>Personalization is native.</b> Liquid variables (<code>{{firstName}}</code>, <code>{{amountDue}}</code>) resolve per-recipient with <code>default</code> filter fallbacks.</li>
-            <li><b>Per-recipient status.</b> The Operations resource returns Delivered / Failed / Unaddressable counters that advance in real time.</li>
-            <li><b>Native scheduling, up to 7 days out.</b> Pass <code>schedule.sendAt</code> in the same API call. Omit the timezone and Twilio auto-localizes each cardholder's send time — so an 8am–9pm ET window becomes 8am–9pm <i>local</i> for every cardholder, without per-zone logic in Continental Finance's scheduler.</li>
+            <li><b>One API call, one MessageSid.</b> <code>POST /Messages.json</code> creates a single message. At Continental Finance's 3.5M/mo (~4/sec average, higher at peak) this becomes a fan-out — one call per cardholder — well within a short code's 100 MPS throughput.</li>
+            <li><b>Personalization is server-rendered.</b> Continental Finance's application builds the <code>body</code> per cardholder before the API call. Full flexibility, no template language limits.</li>
+            <li><b>Per-message status.</b> <code>GET /Messages/{Sid}.json</code> returns the current lifecycle state. Status callbacks also stream every transition to the inbound webhook for BI and audit.</li>
+            <li><b>Native scheduling.</b> <code>scheduleType=fixed</code> + <code>sendAt</code>, between 15 minutes and 7 days out. Continental Finance computes per-cardholder timezone at schedule time.</li>
           </ul>
         </div>
       </div>
@@ -189,8 +184,8 @@
       <div class="scene-head">
         <div>
           <div class="eyebrow">Use Case 2</div>
-          <h2>Suppress reminders the instant a payment posts</h2>
-          <p class="use-case-def">Continental Finance's current ~15-minute lag between a cardholder's payment posting and their SMS provider knowing about it means paid-up cardholders still get past-due reminders. With a near-real-time payment webhook and the pending list re-read at the moment of each send, that lag drops to seconds.</p>
+          <h2>Pull back a scheduled SMS the instant a payment posts</h2>
+          <p class="use-case-def">Continental Finance schedules Jane's payment reminder for 10am tomorrow. Between now and then, Jane pays. Continental Finance's payment webhook fires and Twilio's Update Message API flips that specific message to <code>canceled</code>. Jane never gets the "past-due" text she doesn't need.</p>
         </div>
       </div>
 
@@ -198,47 +193,56 @@
         <div class="eyebrow">Twilio Products used</div>
         <ul class="product-list">
           <li>
-            <div class="product-title"><b>Bulk Messaging API</b> · <code>POST /v1/Messages</code></div>
-            <div class="product-desc">Same endpoint as Use Case 1. Called with the filtered list — recipients whose payment posted since the queue was built are excluded before the call fires.</div>
-            <a href="https://www.twilio.com/docs/bulk-messaging" target="_blank" rel="noreferrer">Docs ↗</a>
+            <div class="product-title"><b>Programmable Messaging · Create Message</b> · <code>POST /2010-04-01/Accounts/{Sid}/Messages.json</code></div>
+            <div class="product-desc">Actively invoked by the Schedule button with <code>scheduleType=fixed</code>, <code>sendAt=+20min</code>, and the Messaging Service SID. Twilio returns a MessageSid and <code>status=scheduled</code>.</div>
+            <a href="https://www.twilio.com/docs/messaging/api/message-resource" target="_blank" rel="noreferrer">Docs ↗</a>
           </li>
           <li>
-            <div class="product-title"><b>Bulk Operations Resource</b> · <code>GET /v1/Messages/Operations/{id}</code></div>
-            <div class="product-desc">Polled after send to confirm the suppressed cardholder's row shows no delivery attempt.</div>
-            <a href="https://www.twilio.com/docs/bulk-messaging" target="_blank" rel="noreferrer">Docs ↗</a>
+            <div class="product-title"><b>Message Scheduling</b> · <code>scheduleType=fixed</code> + <code>sendAt</code></div>
+            <div class="product-desc">Requires a Messaging Service. Fires at the exact sendAt. Cancellable while still in <code>scheduled</code> state.</div>
+            <a href="https://www.twilio.com/docs/messaging/features/message-scheduling" target="_blank" rel="noreferrer">Docs ↗</a>
+          </li>
+          <li>
+            <div class="product-title"><b>Programmable Messaging · Update Message</b> · <code>POST /Messages/{Sid}.json</code> with <code>Status=canceled</code></div>
+            <div class="product-desc">Actively invoked by the Payment-posted button. Flips the scheduled message's status; Twilio drops it before it reaches the carrier.</div>
+            <a href="https://www.twilio.com/docs/messaging/api/message-resource" target="_blank" rel="noreferrer">Docs ↗</a>
+          </li>
+          <li>
+            <div class="product-title"><b>Messaging Service</b></div>
+            <div class="product-desc">Required for both scheduling and cancellation. Owns the sender pool the SMS fires from.</div>
+            <a href="https://www.twilio.com/docs/messaging/services" target="_blank" rel="noreferrer">Docs ↗</a>
           </li>
         </ul>
-        <div class="products-note">The payment webhook endpoint and the pending queue are <b>Continental Finance's own integration</b>, not Twilio products. Twilio's role in this use case is to accept the filtered list and deliver it — which is what makes the mechanic honest and simple.</div>
       </div>
 
       <div class="coach" data-scene-coach="b">
         <div class="coach-step" data-step="1">
           <div class="coach-num">1</div>
           <div class="coach-text">
-            <b>A cardholder pays their bill</b>
-            <span>Continental Finance's payment system POSTs to <code>/webhooks/payment</code> on our server with <code>{phone, accountId, amount, postedAt}</code>. No Twilio call in this step.</span>
+            <b>Schedule Jane's reminder (20 min out)</b>
+            <span>Server calls <b>POST <code>/2010-04-01/Accounts/{Sid}/Messages.json</code></b> with <code>scheduleType=fixed</code>, <code>sendAt</code>, and the Messaging Service SID. Twilio returns a <b>MessageSid</b> and <b>status=<code>scheduled</code></b>.</span>
           </div>
         </div>
         <div class="coach-arrow">→</div>
         <div class="coach-step" data-step="2">
           <div class="coach-num">2</div>
           <div class="coach-text">
-            <b>Our server suppresses that cardholder</b>
-            <span>Server updates the pending queue: sets <code>status = 'suppressed'</code> for that phone. Still no Twilio call — the change lives in Continental Finance's data layer.</span>
+            <b>Payment posts → cancel via Update Message</b>
+            <span>Continental Finance's payment system POSTs to <code>/webhooks/payment</code>. Our server looks up Jane's MessageSid, then calls <b>POST <code>/Messages/{MessageSid}.json</code></b> with <code>Status=canceled</code>. Twilio flips the status.</span>
           </div>
         </div>
         <div class="coach-arrow">→</div>
         <div class="coach-step" data-step="3">
           <div class="coach-num">3</div>
           <div class="coach-text">
-            <b>Send today's 10am reminder</b>
-            <span>Server reads the queue for <code>status = 'pending'</code> <i>at this moment</i>, builds the payload, and <b>POSTs to <code>comms.twilio.com/v1/Messages</code></b>. Twilio only ever sees un-suppressed cardholders.</span>
+            <b>Twilio Console confirms</b>
+            <span>Console → Monitor → Logs → Messaging → find the MessageSid. Status = <b><code>canceled</code></b>. No SMS was ever sent to the cardholder.</span>
           </div>
         </div>
       </div>
 
       <div class="flow-note">
-        <b>Why this works:</b> The Bulk Messaging API doesn't need a "cancel a recipient" endpoint because Continental Finance's server owns the recipient list until the moment of send. Every payment webhook that arrives before the send fires takes effect — no matter how close to send time. Continental Finance's 15-minute lag becomes their webhook-to-suppression latency, which is a millisecond problem.
+        <b>Cancellation window:</b> Cancel only works while the message is in <code>scheduled</code> status. Twilio moves scheduled messages into <code>queued</code> roughly 15 minutes before <code>sendAt</code>. After that, cancellation returns error <a href="https://www.twilio.com/docs/api/errors/30409" target="_blank">30409</a>. Design Continental Finance's schedule lead time with this window in mind.
       </div>
 
       <div class="action-row">
@@ -247,9 +251,13 @@
             <span class="btn-label">Reset queue</span>
             <span class="btn-endpoint">POST <code>/api/queue/reset</code> · local</span>
           </button>
-          <button id="queue-send" class="btn primary large">
-            <span class="btn-label">Send today's 10am reminder</span>
-            <span class="btn-endpoint">POST <code>comms.twilio.com/v1/Messages</code> · Bulk API</span>
+          <button id="queue-schedule" class="btn primary large">
+            <span class="btn-label">Schedule Jane's reminder (20 min from now)</span>
+            <span class="btn-endpoint">POST <code>/2010-04-01/…/Messages.json</code> · <code>scheduleType=fixed</code></span>
+          </button>
+          <button id="queue-cancel" class="btn danger large" disabled>
+            <span class="btn-label">Payment posted → cancel scheduled SMS</span>
+            <span class="btn-endpoint">POST <code>/…/Messages/{Sid}.json</code> · <code>Status=canceled</code></span>
           </button>
         </div>
       </div>
@@ -257,18 +265,24 @@
       <div class="two-col">
         <div class="sub-panel">
           <h3>Today's reminder queue</h3>
-          <p class="sub">Only the highlighted row is your real cell. Peers use the reserved 555-01xx fictional block and will resolve as <code>unaddressable</code> — a real demo of Bulk's per-recipient status without spamming anyone. Click any row's "Payment posted" button to fire a webhook and remove that cardholder from the pending queue.</p>
+          <p class="sub">Only Jane's row (highlighted) is the real cell used for the schedule + cancel demo. Peer rows are visual context for the campaign — they are not scheduled with Twilio during this scene.</p>
           <table class="queue-table" id="queue-table">
             <thead><tr>
-              <th>Cardholder</th><th>Last 4</th><th>Due</th><th>Amount</th><th>Status</th><th></th>
+              <th>Cardholder</th><th>Last 4</th><th>Amount</th><th>Message SID</th><th>Status</th>
             </tr></thead>
             <tbody></tbody>
           </table>
         </div>
         <div class="sub-panel">
           <h3>Live event timeline</h3>
-          <p class="sub">Every payment webhook, suppression, and send fire is stamped here as it happens.</p>
+          <p class="sub">Every scheduled send, payment webhook, and cancel confirmation is stamped here as it happens.</p>
           <ol id="timeline" class="timeline"></ol>
+
+          <h3 style="margin-top: 18px;">Verify in Twilio Console</h3>
+          <p class="sub">After scheduling, open the message in Console to watch the status flip live.</p>
+          <div id="console-link" class="console-link">
+            <span class="sub">Schedule a message to reveal its Console link.</span>
+          </div>
         </div>
       </div>
 
@@ -285,7 +299,7 @@
           </div>
         </div>
         <div id="activity-log-b" class="activity-log">
-          <div class="activity-placeholder">Click a "Payment posted" row and then Send today's 10am reminder to see the mechanic play out.</div>
+          <div class="activity-placeholder">Click Schedule Jane's reminder to begin. Then click Payment posted to see the cancel API in action.</div>
         </div>
       </div>
     </section>

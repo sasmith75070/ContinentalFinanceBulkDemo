@@ -58,63 +58,51 @@ $$('.scene-tab').forEach((tab) => {
   });
 });
 
-// ────────── Operations polling ──────────
-const sessionOperations = {};
+// ────────── Per-message status polling (Programmable Messaging) ──────────
+// Poll GET /Messages/{Sid}.json every 750ms until the message reaches a
+// terminal state (delivered / failed / undelivered / canceled).
+const sessionMessages = {};
 let pollTimer = null;
+const TERMINAL = new Set(['delivered', 'failed', 'undelivered', 'canceled']);
 
-function updateSessionTotals() {
-  const totals = { total: 0, delivered: 0, failed: 0, unaddressable: 0 };
-  for (const op of Object.values(sessionOperations)) {
-    totals.total += op.total || 0;
-    totals.delivered += op.delivered || 0;
-    totals.failed += op.failed || 0;
-    totals.unaddressable += op.unaddressable || 0;
-  }
-  $('stat-total').textContent = totals.total;
-  $('stat-delivered').textContent = totals.delivered;
-  $('stat-failed').textContent = totals.failed;
-  $('stat-unaddressable').textContent = totals.unaddressable;
+function renderStatusCard() {
+  const sids = Object.keys(sessionMessages);
+  if (sids.length === 0) return;
+  const latest = sessionMessages[sids[sids.length - 1]];
+  $('stat-status').textContent = latest.status || '—';
+  $('stat-segments').textContent = latest.numSegments || '—';
+  $('stat-delivered').textContent = latest.dateSent
+    ? new Date(latest.dateSent).toLocaleTimeString()
+    : '—';
+  $('stat-error').textContent = latest.errorCode || '—';
 }
 
-async function pollSingle(opId) {
+async function pollMessage(sid) {
   try {
-    const res = await fetch(`/api/operations/${encodeURIComponent(opId)}`);
+    const res = await fetch(`/api/messages/${encodeURIComponent(sid)}`);
     if (!res.ok) return;
     const data = await res.json();
-    const s = data.stats || {};
-    const prev = sessionOperations[opId] || {};
-    const next = {
-      total: Math.max(prev.total || 0, s.total || 0),
-      delivered: Math.max(prev.delivered || 0, s.delivered || 0),
-      failed: Math.max(prev.failed || 0, s.failed || 0),
-      unaddressable: Math.max(prev.unaddressable || 0, s.unaddressable || 0),
-      status: data.status,
-    };
-    sessionOperations[opId] = next;
-
-    // Log an activity row only when counters change vs prev, to avoid spam.
-    const changed = ['total', 'delivered', 'failed', 'unaddressable'].some(
-      (k) => (prev[k] || 0) !== next[k]
-    );
-    if (changed) {
+    const prev = sessionMessages[sid] || {};
+    sessionMessages[sid] = { ...data };
+    if (prev.status !== data.status) {
       logActivity({
         scene: 'a',
         kind: 'twilio-in',
-        tag: 'Bulk Ops',
-        tech: `GET /v1/Messages/Operations/${opId} · status: ${next.status}`,
-        plain: `Twilio reports for this batch: <b>${next.delivered}</b> delivered · <b>${next.failed}</b> failed · <b>${next.unaddressable}</b> unaddressable (of ${next.total}).`,
+        tag: 'Status',
+        tech: `GET /2010-04-01/Accounts/{Sid}/Messages/${sid}.json`,
+        plain: `Status transitioned to <b><code>${data.status}</code></b>${data.errorCode ? ` · error <code>${data.errorCode}</code>` : ''}.`,
       });
     }
+    renderStatusCard();
   } catch { /* transient */ }
 }
 
 async function pollAll() {
-  const pending = Object.entries(sessionOperations).filter(
-    ([, op]) => op.status !== 'COMPLETED' && op.status !== 'FAILED'
+  const pending = Object.entries(sessionMessages).filter(
+    ([, m]) => !TERMINAL.has(m.status)
   );
   if (pending.length === 0) { clearInterval(pollTimer); pollTimer = null; return; }
-  await Promise.all(pending.map(([opId]) => pollSingle(opId)));
-  updateSessionTotals();
+  await Promise.all(pending.map(([sid]) => pollMessage(sid)));
 }
 
 function startPolling() {
@@ -123,14 +111,10 @@ function startPolling() {
   pollTimer = setInterval(pollAll, 750);
 }
 
-function primeOperation(operationId, recipientCount) {
-  if (!operationId) return;
-  sessionOperations[operationId] = {
-    total: recipientCount || 0,
-    delivered: 0, failed: 0, unaddressable: 0,
-    status: 'SUBMITTED',
-  };
-  updateSessionTotals();
+function primeMessage(sid, initialStatus) {
+  if (!sid) return;
+  sessionMessages[sid] = { sid, status: initialStatus || 'accepted' };
+  renderStatusCard();
   startPolling();
 }
 
@@ -170,8 +154,8 @@ async function fireCampaign({ scheduleFor, buttonId, scheduleLabel } = {}) {
     tag: 'Server',
     tech: `POST /api/campaigns/send${scheduleFor ? ' · scheduleFor=' + scheduleFor : ''}`,
     plain: scheduleFor
-      ? `Server builds a Bulk payload with <code>schedule.sendAt</code> set to <b>${scheduleLabel}</b> and forwards to Twilio.`
-      : 'Server builds an immediate Bulk payload and forwards to Twilio.',
+      ? `Server renders Jane's personalized body and calls Programmable Messaging with <code>scheduleType=fixed</code>, <code>sendAt</code> = <b>${scheduleLabel}</b>.`
+      : 'Server renders Jane\'s personalized body and calls Programmable Messaging for immediate send.',
   });
   const started = performance.now();
   try {
@@ -183,32 +167,46 @@ async function fireCampaign({ scheduleFor, buttonId, scheduleLabel } = {}) {
     const data = await res.json();
     const ms = Math.round(performance.now() - started);
     $('http-status').textContent = res.status;
-    $('op-id').textContent = data.operationId || '—';
-    setRaw(undefined, data, 'POST https://comms.twilio.com/v1/Messages · Bulk API');
+    $('op-id').textContent = data.messageSid || '—';
+    setRaw(
+      data.request,
+      data.response || { sid: data.messageSid, status: data.status, sendAt: data.sendAt },
+      'POST https://api.twilio.com/2010-04-01/Accounts/{Sid}/Messages.json · Programmable Messaging'
+    );
 
     let plain;
     if (!res.ok) {
-      plain = `Twilio rejected the request: ${data.error || 'unknown error'}`;
+      plain = `Twilio rejected the request: ${data.error || 'unknown error'}${data.code ? ` (code ${data.code})` : ''}`;
     } else if (data.scheduled) {
-      plain = `Twilio accepted a <b>scheduled</b> send for <b>${data.sendAt}</b> (no timezone → Twilio localizes to each cardholder). <b>${data.recipientCount}</b> cardholder(s). Operation <code>${data.operationId || '—'}</code>. Delivery fires at 10am <i>local</i> per cardholder — no cron on our side.`;
+      plain = `Twilio accepted a <b>scheduled</b> message for <b>${data.sendAt}</b>.<br>
+              MessageSid: <code>${data.messageSid}</code><br>
+              Status: <b><code>${data.status}</code></b>. Fires at sendAt.`;
     } else {
-      plain = `Twilio accepted <b>${data.recipientCount}</b> cardholder(s) for immediate delivery. Operation <code>${data.operationId || '—'}</code>. Per-recipient status will stream back via GET /Operations.`;
+      plain = `Twilio accepted the message for immediate delivery.<br>
+              MessageSid: <code>${data.messageSid}</code><br>
+              Status: <b><code>${data.status}</code></b>. Status callbacks + GET /Messages/{Sid} will report transitions.`;
     }
 
     logActivity({
       scene: 'a',
       kind: 'bulk',
-      tag: 'Bulk API',
-      tech: 'POST https://comms.twilio.com/v1/Messages',
+      tag: 'Twilio API',
+      tech: 'POST https://api.twilio.com/2010-04-01/Accounts/{Sid}/Messages.json',
       plain,
       status: `${res.status} · ${ms}ms`,
       statusClass: res.ok ? 'ok' : 'err',
       doc: scheduleFor
-        ? { url: 'https://www.twilio.com/docs/bulk-messaging/scheduling', label: 'Docs · Bulk Messaging: Scheduling' }
-        : { url: 'https://www.twilio.com/docs/bulk-messaging/api/message-resource', label: 'Docs · Bulk Messaging: Message resource' },
+        ? { url: 'https://www.twilio.com/docs/messaging/features/message-scheduling', label: 'Docs · Message Scheduling' }
+        : { url: 'https://www.twilio.com/docs/messaging/api/message-resource', label: 'Docs · Message resource' },
     });
 
-    if (data.operationId) { primeOperation(data.operationId, data.recipientCount); advanceCoach('a', 3); }
+    if (data.messageSid && !data.scheduled) {
+      primeMessage(data.messageSid, data.status);
+      advanceCoach('a', 3);
+    } else if (data.messageSid && data.scheduled) {
+      $('stat-status').textContent = 'scheduled';
+      advanceCoach('a', 3);
+    }
   } catch (err) {
     $('raw-response').textContent = `ERROR: ${err.message}`;
     logActivity({ scene: 'a', kind: 'local', tag: 'Error', plain: `Send failed locally: ${err.message}`, statusClass: 'err' });
@@ -219,14 +217,16 @@ async function fireCampaign({ scheduleFor, buttonId, scheduleLabel } = {}) {
 
 $('send-btn').addEventListener('click', () => fireCampaign({ buttonId: 'send-btn' }));
 $('schedule-btn').addEventListener('click', () => fireCampaign({
-  scheduleFor: 'tomorrow-10am-local',
-  scheduleLabel: '10:00 tomorrow (per-cardholder local time)',
+  scheduleFor: 'tomorrow-10am-et',
+  scheduleLabel: '10:00 tomorrow ET',
   buttonId: 'schedule-btn',
 }));
 
-// ────────── Scene B — payment-triggered suppression + list-right-before-send ──────────
+// ────────── Scene B — schedule + cancel (message pull-back) ──────────
 const queueTableBody = document.querySelector('#queue-table tbody');
 const timelineEl = $('timeline');
+const consoleLinkEl = $('console-link');
+let customerPhoneClient = null;
 
 function fmtTime(iso) {
   const d = iso ? new Date(iso) : new Date();
@@ -239,55 +239,31 @@ function addTimeline({ label, detail, kind, at }) {
   timelineEl.prepend(li);
 }
 
+function statusBadge(status) {
+  if (status === 'scheduled') return '<span class="badge scheduled">Scheduled</span>';
+  if (status === 'canceled')  return '<span class="badge canceled">Canceled</span>';
+  if (status === 'suppressed') return '<span class="badge suppressed">Suppressed</span>';
+  return '<span class="badge pending">Pending</span>';
+}
+
 function renderQueue(queue) {
   queueTableBody.innerHTML = '';
   for (const r of queue) {
+    if (r.isCustomer) customerPhoneClient = r.phone;
     const tr = document.createElement('tr');
     if (r.isCustomer) tr.classList.add('customer-row');
-    if (r.status !== 'pending') tr.classList.add('suppressed');
-    const badge = r.status === 'pending'
-      ? '<span class="badge pending">Pending</span>'
-      : '<span class="badge suppressed">Suppressed</span>';
+    if (r.status === 'canceled' || r.status === 'suppressed') tr.classList.add('suppressed');
+    const sidCell = r.messageSid
+      ? `<code>${r.messageSid}</code>`
+      : (r.isCustomer ? '<span class="sub">not scheduled yet</span>' : '<span class="sub">—</span>');
     tr.innerHTML = `
       <td>${r.firstName || '—'}${r.isCustomer ? '<span class="badge customer">Real</span>' : ''}</td>
       <td>&bull;&bull;&bull;&bull; ${r.lastFour || '—'}</td>
-      <td>${r.dueDate || '—'}</td>
       <td>${r.amountDue || '—'}</td>
-      <td>${badge}</td>
-      <td>${r.status === 'pending'
-        ? `<button class="btn small ghost pay-btn" data-phone="${r.phone}" data-name="${r.firstName || ''}">Payment posted</button>`
-        : ''}</td>`;
+      <td class="mono">${sidCell}</td>
+      <td>${statusBadge(r.status)}</td>`;
     queueTableBody.appendChild(tr);
   }
-  queueTableBody.querySelectorAll('.pay-btn').forEach((btn) => {
-    btn.addEventListener('click', async () => {
-      btn.disabled = true;
-      const phone = btn.dataset.phone;
-      const name = btn.dataset.name;
-      advanceCoach('b', 2);
-      logActivity({
-        scene: 'b',
-        kind: 'server', tag: 'Payment webhook',
-        tech: 'POST /webhooks/payment',
-        plain: `Continental Finance's payment system posts a payment for <b>${name}</b>. Server suppresses that cardholder from today's queue — no Twilio call.`,
-      });
-      try {
-        await fetch('/webhooks/payment', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            phone,
-            accountId: 'ACCT-' + phone.slice(-4),
-            amount: '47.50',
-            postedAt: new Date().toISOString(),
-            event: 'payment.posted',
-          }),
-        });
-      } catch (err) {
-        logActivity({ scene: 'b', kind: 'local', tag: 'Error', plain: `Payment sim failed: ${err.message}`, statusClass: 'err' });
-      }
-    });
-  });
 }
 
 async function loadQueue() {
@@ -296,13 +272,26 @@ async function loadQueue() {
   renderQueue(data.queue || []);
 }
 
+function setConsoleLink(sid) {
+  if (!sid) {
+    consoleLinkEl.innerHTML = '<span class="sub">Schedule a message to reveal its Console link.</span>';
+    return;
+  }
+  const url = `https://console.twilio.com/us1/monitor/logs/sms?frameUrl=/console/sms/logs/${sid}`;
+  consoleLinkEl.innerHTML = `
+    <a href="${url}" target="_blank" rel="noreferrer">Open ${sid} in Twilio Console ↗</a>
+    <span class="console-hint">Console → Monitor → Logs → Messaging. Refresh the log to watch the status flip live.</span>`;
+}
+
 $('queue-reset').addEventListener('click', async () => {
   advanceCoach('b', 1);
+  $('queue-cancel').disabled = true;
+  setConsoleLink(null);
   logActivity({
     scene: 'b',
     kind: 'server', tag: 'Server',
     tech: 'POST /api/queue/reset',
-    plain: `Rebuilding today's Surge Mastercard reminder queue — no Twilio call.`,
+    plain: 'Rebuilding today\'s Surge Mastercard reminder queue — no Twilio call.',
   });
   const res = await fetch('/api/queue/reset', { method: 'POST' });
   const data = await res.json();
@@ -310,47 +299,109 @@ $('queue-reset').addEventListener('click', async () => {
   addTimeline({ label: 'Queue reset', detail: `${(data.queue || []).length} rows loaded`, kind: '' });
 });
 
-$('queue-send').addEventListener('click', async () => {
-  const btn = $('queue-send');
+$('queue-schedule').addEventListener('click', async () => {
+  const btn = $('queue-schedule');
   btn.disabled = true;
-  advanceCoach('b', 3);
+  advanceCoach('b', 1);
   logActivity({
     scene: 'b',
     kind: 'server', tag: 'Server',
-    tech: 'POST /api/queue/send',
-    plain: `Server reads the pending queue <i>right now</i>, filters DNC, then POSTs the surviving list to Twilio Bulk.`,
+    tech: 'POST /api/queue/schedule',
+    plain: 'Server calls Programmable Messaging to schedule Jane\'s reminder 20 minutes from now.',
   });
   const started = performance.now();
   try {
-    const res = await fetch('/api/queue/send', { method: 'POST' });
+    const res = await fetch('/api/queue/schedule', { method: 'POST' });
     const data = await res.json();
     const ms = Math.round(performance.now() - started);
     if (!res.ok) {
-      addTimeline({ label: 'Send failed', detail: data.error || `HTTP ${res.status}`, kind: 'suppress' });
-      logActivity({ scene: 'b', kind: 'local', tag: 'Error', tech: `HTTP ${res.status}`, plain: data.error || 'Send failed', status: `${res.status} · ${ms}ms`, statusClass: 'err' });
+      logActivity({ scene: 'b', kind: 'local', tag: 'Error', tech: `HTTP ${res.status}`, plain: data.error || 'Schedule failed', status: `${res.status} · ${ms}ms`, statusClass: 'err' });
+      addTimeline({ label: 'Schedule failed', detail: data.error || `HTTP ${res.status}`, kind: 'suppress' });
       return;
     }
     setRaw(
       data.request,
-      { status: res.status, body: data.response, operationId: data.operationId, recipientCount: data.recipientCount, suppressedCount: data.suppressedCount },
-      'POST https://comms.twilio.com/v1/Messages · Bulk API'
+      data.response || { sid: data.messageSid, status: data.status, sendAt: data.sendAt },
+      'POST https://api.twilio.com/2010-04-01/Accounts/{Sid}/Messages.json · Programmable Messaging'
     );
-    addTimeline({
-      label: 'Send fired',
-      detail: `${data.recipientCount} sent · ${data.suppressedCount || 0} suppressed · op ${data.operationId || '—'}`,
-      kind: 'send',
-    });
     logActivity({
       scene: 'b',
-      kind: 'bulk', tag: 'Bulk API',
-      tech: 'POST https://comms.twilio.com/v1/Messages',
-      plain: `Twilio accepted <b>${data.recipientCount}</b> cardholder(s). <b>${data.suppressedCount || 0}</b> excluded because their payment posted before send. <b>${(data.blockedByDnc || []).length}</b> filtered by DNC. Operation <code>${data.operationId || '—'}</code>.`,
+      kind: 'bulk', tag: 'Twilio API',
+      tech: 'POST https://api.twilio.com/2010-04-01/Accounts/{Sid}/Messages.json',
+      plain: `Twilio Programmable Messaging accepted the scheduled send.<br>
+              MessageSid: <code>${data.messageSid}</code><br>
+              Status: <b><code>${data.status}</code></b><br>
+              sendAt: <code>${data.sendAt}</code><br>
+              Cancel is available until Twilio moves it to <code>queued</code> (~15 min before sendAt).`,
       status: `${res.status} · ${ms}ms`, statusClass: 'ok',
-      doc: { url: 'https://www.twilio.com/docs/bulk-messaging', label: 'Docs · Bulk Messaging' },
+      doc: { url: 'https://www.twilio.com/docs/messaging/features/message-scheduling', label: 'Docs · Message Scheduling' },
     });
-    if (data.operationId) primeOperation(data.operationId, data.recipientCount);
+    addTimeline({ label: 'Scheduled', detail: `${data.messageSid} · fires ${new Date(data.sendAt).toLocaleTimeString()}`, kind: 'send' });
+    setConsoleLink(data.messageSid);
+    $('queue-cancel').disabled = false;
+    advanceCoach('b', 2);
+    loadQueue();
   } finally {
     btn.disabled = false;
+  }
+});
+
+$('queue-cancel').addEventListener('click', async () => {
+  const btn = $('queue-cancel');
+  if (!customerPhoneClient) { logActivity({ scene: 'b', kind: 'local', tag: 'Error', plain: 'No customer phone in queue.' }); return; }
+  btn.disabled = true;
+  advanceCoach('b', 2);
+  logActivity({
+    scene: 'b',
+    kind: 'server', tag: 'Payment webhook',
+    tech: 'POST /webhooks/payment',
+    plain: 'Continental Finance\'s payment system posts a payment for Jane. Server looks up her MessageSid.',
+  });
+  const started = performance.now();
+  try {
+    const res = await fetch('/webhooks/payment', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        phone: customerPhoneClient,
+        accountId: 'ACCT-' + customerPhoneClient.slice(-4),
+        amount: '47.50',
+        postedAt: new Date().toISOString(),
+        event: 'payment.posted',
+      }),
+    });
+    const data = await res.json();
+    const ms = Math.round(performance.now() - started);
+    if (!res.ok) {
+      const hint = data.hint ? `<br><i>${data.hint}</i>` : '';
+      logActivity({
+        scene: 'b',
+        kind: 'local', tag: 'Cancel failed',
+        tech: `HTTP ${res.status} · code ${data.code || '—'}`,
+        plain: `${data.error || 'Cancel failed'}${hint}`,
+        status: `${res.status} · ${ms}ms`, statusClass: 'err',
+      });
+      return;
+    }
+    setRaw(
+      { messagesResource: `/2010-04-01/Accounts/{AccountSid}/Messages/${data.messageSid}.json`, method: 'POST', body: { Status: 'canceled' } },
+      data.response || { sid: data.messageSid, status: data.status },
+      `POST https://api.twilio.com/2010-04-01/Accounts/{Sid}/Messages/${data.messageSid}.json · Update Message`
+    );
+    logActivity({
+      scene: 'b',
+      kind: 'bulk', tag: 'Twilio API',
+      tech: `POST https://api.twilio.com/2010-04-01/Accounts/{Sid}/Messages/${data.messageSid}.json · Status=canceled`,
+      plain: `Twilio flipped the message status.<br>
+              MessageSid: <code>${data.messageSid}</code><br>
+              Status: <b><code>${data.status}</code></b><br>
+              The scheduled SMS will never be delivered. Verify in the Twilio Console.`,
+      status: `${res.status} · ${ms}ms`, statusClass: 'ok',
+      doc: { url: 'https://www.twilio.com/docs/api/errors/30409', label: 'Docs · Cancellation rules' },
+    });
+    advanceCoach('b', 3);
+  } finally {
+    // stay disabled after successful cancel
   }
 });
 
@@ -463,32 +514,30 @@ es.onmessage = (e) => {
     const evt = JSON.parse(e.data);
     switch (evt.type) {
       case 'campaign.submitted': {
-        setRaw(
-          evt.request,
-          { status: evt.status, body: evt.response && evt.response.body, headers: evt.response && evt.response.headers },
-          'POST https://comms.twilio.com/v1/Messages · Bulk API'
-        );
-        const body = (evt.request && evt.request.content && evt.request.content.text) || '';
-        const firstRecipient = evt.request && evt.request.to && evt.request.to[0];
-        const vars = (firstRecipient && firstRecipient.variables) || {};
-        if (body) addToThread({ direction: 'outbound', body: renderTemplate(body, vars) });
+        // Programmable Messaging path — server rendered body already.
+        const body = (evt.request && evt.request.body) || evt.body || '';
+        if (body) addToThread({ direction: 'outbound', body });
         break;
       }
       case 'queue.reset': {
         renderQueue(evt.queue || []);
         break;
       }
-      case 'queue.suppressed': {
+      case 'queue.scheduled': {
         loadQueue();
         addTimeline({
-          label: 'Payment posted → suppressed',
-          detail: `${evt.firstName || evt.phone} removed from pending queue`,
-          kind: 'suppress', at: evt.at,
+          label: 'Scheduled',
+          detail: `${evt.messageSid} for ${evt.firstName || evt.phone}`,
+          kind: 'send', at: evt.at,
         });
-        logActivity({
-          scene: 'b',
-          kind: 'twilio-in', tag: 'Suppress',
-          plain: `<b>${evt.firstName || evt.phone}</b> now marked suppressed. Won't be in the next Bulk send payload.`,
+        break;
+      }
+      case 'queue.canceled': {
+        loadQueue();
+        addTimeline({
+          label: 'Payment posted → canceled',
+          detail: `${evt.messageSid || evt.phone} · status = ${evt.status}`,
+          kind: 'suppress', at: evt.at,
         });
         break;
       }

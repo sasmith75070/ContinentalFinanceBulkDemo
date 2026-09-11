@@ -104,21 +104,22 @@ doc.fillColor('#8ea0bd').font('Helvetica').fontSize(10)
 // ────────── PURPOSE ──────────
 newPage();
 h1('Purpose & flow');
-p('This demo answers Continental Finance\'s SMS RFP by proving three of the four core use cases live against the Twilio Bulk Messaging API. It runs 15–20 minutes end-to-end.');
+p('This demo answers Continental Finance\'s SMS RFP by proving three of the four core use cases live against Twilio\'s Programmable Messaging API. It runs 15–20 minutes end-to-end.');
 p('The fourth use case (business-user campaign administration) is addressed as a talk-track in this document — Twilio Console covers most of it honestly, and we concede the one gap explicitly.');
 
-h2('Three scenes, one browser, one cell phone');
-keyValue('Use Case 1', 'Payment reminder + past-due messaging — high-volume, personalized, scheduled.');
-keyValue('Use Case 2', 'Payment-triggered suppression — near-real-time list-right-before-send.');
+h2('Three use cases, one browser, one cell phone');
+keyValue('Use Case 1', 'Payment reminder — immediate send + scheduled send via Programmable Messaging Create Message.');
+keyValue('Use Case 2', 'Message pull-back — schedule + cancel via Update Message with Status=canceled.');
 keyValue('Use Case 3', 'Response & opt-out — Advanced Opt-Out + free-form capture + DNC.');
 
 h2('What you\'ll ask them to notice');
-bullet('One API call, up to 10,000 recipients per request, per-recipient status tracking.');
-bullet('Personalization via Liquid variables — no per-recipient API call.');
-bullet('Native scheduling with per-cardholder timezone localization (Bulk feature, no cron needed).');
-bullet('Rich content is on the same API — Content Templates plus SMS fallback.');
+bullet('Per-message MessageSid — every send is individually addressable, cancellable, and auditable.');
+bullet('Personalization is server-rendered — full flexibility, no template-language limits.');
+bullet('Native scheduling from 15 min to 7 days out via scheduleType=fixed + sendAt.');
+bullet('Cancel-in-flight via Update Message with Status=canceled while message is still scheduled.');
 bullet('STOP/START/HELP handled natively via Advanced Opt-Out — zero code.');
 bullet('Free-form inbound captured for human review — real cross-sender DNC.');
+bullet('At 3.5M/mo (~4/sec average), fan-out fits comfortably inside short-code throughput (100 MPS).');
 
 // ────────── SETUP ──────────
 newPage();
@@ -138,53 +139,57 @@ step(4, 'Advanced Opt-Out configured',
   'Same service → Opt-Out Management → Advanced enabled. Custom Surge STOP copy set (see appendix for suggested wording). Keywords: STOP/START/HELP.');
 
 step(5, 'Dashboard open',
-  'Browser: http://localhost:3001 — you should see the Surge SMS Operations Center, three tabs (A, B, C), and the pulsing green "Live" pill in the header.');
+  'Browser: http://localhost:3001 — you should see the Continental Finance SMS Operations header and three Use Case tabs (1, 2, 3).');
 
 step(6, 'Cell in hand, signal confirmed',
   'You\'ll text to the Surge long code from your cell during Use Case 3. Test with a single "test" text before the demo starts — it will show up in the Inbound stream and you\'ll know the round-trip works.');
 
 muted('Fallback: if ngrok flakes or Twilio 5xx during the demo, you have a screen-recorded backup take. Do not attempt to fix live — pivot to the recording and keep talking.');
 
-// ────────── SCENE A ──────────
+// ────────── USE CASE 1 ──────────
 newPage();
 h1('Use Case 1 · Payment Reminder');
-muted('RFP use case 1: high-volume scheduled reminders. Target: 3 minutes.');
+muted('RFP use case 1: high-volume payment reminder + past-due messaging. Target: 3 minutes.');
 
 h3('Open on Use Case 1 tab');
-say('Continental sends 3.5 million payment reminders a month today — both proactive statement-due nudges and past-due delinquency messaging — from short codes, in an 8-to-9 window. Watch what one Twilio Bulk API call looks like.');
+say('Continental sends 3.5 million payment reminders a month today — both proactive statement-due nudges and past-due delinquency messaging — from short codes, in an 8-to-9 window. Watch what one Programmable Messaging API call looks like.');
 
 step(1, 'Click "Send now"',
-  'The activity log below shows exactly what happens: dashboard hits our server, server calls Twilio Bulk API, Twilio returns 202 Accepted with an operationId. Counters advance. Your cell gets a real SMS in under 4 seconds.');
-say('That was one API call. Same call scales to 10,000 recipients per request. The counters — Total, Delivered, Failed, Unaddressable — come back per recipient from Twilio\'s Operations resource. No polling loops on your side.');
+  'Dashboard hits our server. Server renders Jane\'s personalized body and calls client.messages.create() with the Messaging Service SID. Twilio returns 201 Created + a MessageSid. The status card flips through queued → sending → sent → delivered as GET /Messages/{Sid} is polled every 750ms. Your cell buzzes with the real message.');
+say('One API call, one MessageSid. At Continental Finance\'s 3.5 million a month — about four per second average — that becomes a fan-out. One call per cardholder. A single short code handles 100 messages per second, so throughput is not the bottleneck. And every message has its own SID: fully cancellable, fully auditable, one row per cardholder in Console.');
 
-step(2, 'Click "Schedule for 10am tomorrow (per-cardholder local)"',
-  'Same Bulk API, this time with a schedule.sendAt field. Point at the activity log — highlight that the sendAt has NO timezone marker.');
-say('This is the win Continental doesn\'t have today: because we didn\'t specify a timezone, Twilio localizes 10am to each cardholder\'s zone based on their phone number. An 8-to-9 ET window becomes 8-to-9 LOCAL for every one of your 3.5 million cardholders — without you segmenting the file by timezone. That work moves off your scheduler.');
+step(2, 'Click "Schedule for 10am tomorrow ET"',
+  'Same Programmable Messaging endpoint, this time with scheduleType=fixed and sendAt=<tomorrow 10:00 ET>. Twilio returns a MessageSid with status=scheduled. This message will hold on Twilio\'s schedule and fire at the sendAt time.');
+say('Programmable Messaging supports scheduling from fifteen minutes to seven days out. Continental Finance would compute the per-cardholder sendAt in their scheduler — for a national footprint that means one API call per cardholder with their own local sendAt. The trade-off is honest: no auto-timezone-localization like Bulk offers, but full per-message cancellability.');
 
-step(3, 'Point at the "Rich content, same API" bullet',
-  'Bottom of the "What this proves" panel.');
-say('Same endpoint accepts Content Templates by SID for RCS cards, MMS, WhatsApp — and with a channels.priority array of RCS then SMS, Twilio delivers the richest format the cardholder\'s device supports and automatically falls back to SMS for everyone else. One payload, one API, best-format-per-cardholder.');
+h3('Talking point');
+p('For any scheduled message, Continental Finance can pull it back before send fires by calling Update Message with Status=canceled. That is exactly what Use Case 2 demonstrates — the same MessageSid pattern, extended to the payment-triggered cancel flow.');
 
 
 // ────────── USE CASE 2 ──────────
 newPage();
-h1('Use Case 2 · Payment-Triggered Suppression');
-muted('RFP use case 2: "receive payment/account updates quickly enough to remove customers from active campaigns and prevent unnecessary reminders after payment." Target: 3 minutes.');
+h1('Use Case 2 · Message Pull-back (Payment-Triggered Cancel)');
+muted('RFP use case 2: "receive payment/account updates quickly enough to remove customers from active campaigns and prevent unnecessary reminders after payment." Target: 4 minutes.');
 
 h3('Open Use Case 2 tab');
-say('Continental Finance\'s current lag from payment posting to reminder suppression is about fifteen minutes — the RFP calls this out explicitly. Payment posts, but the SMS provider does not know about it in time, and the reminder still fires. Watch what near-real-time suppression looks like when the list is built at the moment of send.');
+say('Continental Finance\'s current lag from payment to suppression is about fifteen minutes. Payment posts, but the SMS provider does not know about it in time, and the reminder still fires. Watch how message pull-back on Programmable Messaging closes that gap for scheduled sends.');
 
-step(1, 'Click any peer row\'s "Payment posted" button',
-  'Simulates Continental Finance\'s payment system firing a webhook — POST /webhooks/payment with a Fiserv-shaped payload {phone, accountId, amount, postedAt}. Our server marks that cardholder as suppressed in the pending queue. Row grays out, status badge flips to "Suppressed", timeline stamps the event, activity log narrates in plain English. NO Twilio call in this step.');
-say('That was a payment-posted webhook. Continental Finance\'s server suppressed that cardholder from today\'s queue — immediately. No batch job, no 15-minute cycle. Whatever their webhook-to-database latency is, that becomes their new suppression latency.');
+step(1, 'Click "Schedule Jane\'s reminder (20 min from now)"',
+  'Our server calls POST /2010-04-01/Accounts/{Sid}/Messages.json with scheduleType=fixed, sendAt=+20min, and the Messaging Service SID. Twilio returns a MessageSid and status=scheduled. Jane\'s row in the queue table shows the MessageSid; status badge flips to "Scheduled" (blue). The Twilio Console link lights up on the right so you can verify Twilio\'s view of the state.');
+say('Twilio now holds this message on its schedule. It will fire in twenty minutes unless we cancel it first. Every cardholder scheduled the same way gets their own MessageSid — no batch handle, no shared operationId. Each message is independently addressable.');
 
-step(2, 'Click "Send today\'s 10am reminder"',
-  'Bulk API call fires with only the pending rows. Server reads the queue AT THIS MOMENT — including every payment that has posted since the queue was built. Counters advance. Activity log shows: "N cardholders — M excluded because their payment posted before send." The suppressed cardholder shows no delivery in the operations resource.');
-say('This is the "list-right-before-send" mechanic. The list is re-read at the moment of the API call, not at scheduling time. If ten thousand cardholders paid in the ninety seconds between the queue building and the send firing, all ten thousand are automatically excluded. Continental Finance\'s 15-minute lag is gone.');
+step(2, 'Click "Payment posted → cancel scheduled SMS"',
+  'Simulates Continental Finance\'s payment system firing a webhook — POST /webhooks/payment with {phone, accountId, amount, postedAt}. Our server looks up Jane\'s MessageSid, then calls POST /2010-04-01/Accounts/{Sid}/Messages/{MessageSid}.json with Status=canceled. Twilio returns status=canceled. The queue row flips to "Canceled" (red).');
+say('That was one API call to pull back one specific message. Update Message with Status=canceled. Twilio drops the scheduled SMS before it ever reaches the carrier. At Continental Finance\'s scale, this is the pattern: payment webhook fires, server looks up the MessageSid for that cardholder, cancel API call goes out. Millisecond latency, per-cardholder precision.');
 
-h3('Talking point');
-p('The Bulk Messaging API does not need a "cancel a recipient" endpoint because Continental Finance\'s server owns the list until the moment of send. Every payment webhook that arrives before the send fires takes effect — no matter how close to send time. This works because the mechanic honors what the API is: fire-and-deliver.');
-say('For flows where Continental Finance wants to schedule an SMS on Twilio and pull it back later — a different pattern, a different API — see the supporting capabilities appendix at the end of this guide.');
+step(3, 'Verify in Twilio Console',
+  'Click the "Open in Twilio Console" link on the right side of the scene. Console → Monitor → Logs → Messaging shows the MessageSid with status=canceled. Refresh to confirm.');
+say('That is the audit record. Continental Finance\'s compliance team, or Amplix during their review, can walk this trail for any message: scheduled at X, canceled at Y, never delivered. No cardholder ever saw the past-due reminder they had already paid.');
+
+h3('Honest note on the cancellation window');
+p('Cancellation is only available while status = scheduled. Twilio moves scheduled messages to queued approximately 15 minutes before sendAt. After that, Update Message returns error 30409 and the message is committed.');
+p('Practical implication for Continental Finance: design schedule lead time so there is always a cancel window before send. If a payment can post right up to the reminder fire time, schedule at least 15 minutes into the future.');
+say('This is documented behavior. If evaluators ask what happens if payment posts fourteen minutes before send: Twilio returns error thirty-thousand-four-oh-nine, the message is already committed to queue. Design your lead time accordingly.');
 
 // ────────── SCENE C ──────────
 newPage();
@@ -233,13 +238,13 @@ h2('Business users self-serve for');
 bullet('DNC / suppression list management via Messaging > Advanced Opt-Out (Console).');
 bullet('Opt-out confirmation wording — the custom Surge copy is editable in Console without a code deploy.');
 bullet('Sender Pool / Messaging Service configuration — add or remove numbers, change routing rules.');
-bullet('Scheduling adjustments and pausing campaigns — Bulk scheduling window up to 7 days out.');
+bullet('Scheduling adjustments and pausing campaigns — Programmable Messaging scheduling window from 15 min to 7 days out.');
 bullet('Delivery monitoring, alerts, reports — Console + Insights + Event Streams for BI destinations.');
 bullet('User & role management via Twilio IAM for tenant-scoped access.');
 
 h2('Where we concede honestly');
 p('Changing SMS body copy itself still requires an application code change. Twilio does not ship a business-user editor for SMS body text.');
-p('If Continental Finance wants a business-user-facing content editor on top of Bulk Messaging, that is a scoped services engagement — quoted separately. We won\'t fake it in this demo.');
+p('If Continental Finance wants a business-user-facing content editor on top of Programmable Messaging, that is a scoped services engagement — quoted separately. We won\'t fake it in this demo.');
 say('The RFP explicitly asks for business-user self-service without IT code changes. For everything except message body copy, Console + IAM cover it. For message body copy, you get a services engagement price with a real Twilio partner. That is honest, and if that gap is the deal-breaker, we\'ll size the services engagement in the follow-up.');
 
 // ────────── CONCESSIONS SUMMARY ──────────
@@ -248,7 +253,7 @@ h1('Honest concessions summary');
 muted('You will get asked. Answer directly.');
 
 h2('Business-user SMS body editor');
-p('Twilio does not ship this. Console covers DNC, sender config, opt-out wording, scheduling, monitoring — but NOT body copy. Body copy edits are a code change, or a services engagement to build a content editor on top of Bulk.');
+p('Twilio does not ship this. Console covers DNC, sender config, opt-out wording, scheduling, monitoring — but NOT body copy. Body copy edits are a code change, or a services engagement to build a content editor on top of Programmable Messaging.');
 
 h2('Programmatic re-opt from Twilio block list');
 p('Advanced Opt-Out block list is Console-managed. No public REST API to remove numbers from that block list. Customer texts START, or Support intervenes.');
@@ -269,38 +274,18 @@ code('You\'re re-subscribed to Surge Mastercard reminders.\nMsg&data rates may a
 h3('HELP reply');
 code('Surge Mastercard from Continental Finance.\nCall 1-877-xxx-xxxx for cardholder services.\nMsg&data rates may apply. Reply STOP to opt out.');
 
-h1('Appendix · Sample Bulk API payload with schedule');
-code(JSON.stringify({
-  from: { address: '+18776197994', channel: 'SMS' },
-  to: [
-    { address: '+15551234567', channel: 'PHONE',
-      variables: { firstName: 'Jane', lastFour: '4832', dueDate: 'Sep 15', amountDue: '$47.50' } }
-  ],
-  content: { text: "Hi {{firstName | default: 'Customer'}}, this is a reminder..." },
-  schedule: { sendAt: ['2026-09-11T10:00:00'] }
-}, null, 2));
+h1('Appendix · Sample Programmable Messaging payloads');
 
-// ────────── SUPPORTING CAPABILITIES ──────────
-newPage();
-h1('Supporting capability · Programmable Messaging schedule + cancel');
-muted('Not required by the Continental Finance RFP. Available if a specific flow needs an SMS scheduled on Twilio and pulled back later.');
+h3('Immediate send');
+code('POST /2010-04-01/Accounts/{AccountSid}/Messages.json\n\nmessagingServiceSid = MG…\nto = +15551234567\nbody = "Hi Jane, this is a reminder that your Surge Mastercard ending in 4832 has a payment of $47.50 due on Sep 15. Reply STOP to opt out."');
 
-p('Continental Finance\'s core RFP requirement for Use Case 2 (near-real-time payment-triggered suppression) is best served by the list-right-before-send mechanic on Bulk Messaging — that is what the live demo shows.');
-p('For narrower flows where a specific message has already been handed to Twilio and must be pulled back before send, Twilio\'s Programmable Messaging API supports a documented cancel flow. Available if it comes up in Q&A.');
+h3('Scheduled send (15 min – 7 days out)');
+code('POST /2010-04-01/Accounts/{AccountSid}/Messages.json\n\nmessagingServiceSid = MG…\nto = +15551234567\nbody = "Hi Jane, this is a reminder…"\nscheduleType = fixed\nsendAt = 2026-09-12T14:00:00Z');
+p('Returns MessageSid + status=scheduled.');
 
-h3('Schedule');
-p('Programmable Messaging Create Message with a Messaging Service SID and scheduleType=fixed:');
-code('POST /2010-04-01/Accounts/{AccountSid}/Messages.json\n\nmessagingServiceSid = MG…\nto = +1…\nbody = "Your Surge payment is due Sep 15…"\nscheduleType = fixed\nsendAt = 2026-09-11T15:20:00Z');
-p('Twilio returns a MessageSid and status=scheduled. Minimum lead time is 15 minutes; maximum is 7 days.');
-
-h3('Cancel');
-p('While the message is still in scheduled status:');
+h3('Cancel a scheduled message');
 code('POST /2010-04-01/Accounts/{AccountSid}/Messages/{MessageSid}.json\n\nStatus = canceled');
-p('Twilio flips the status to canceled and drops the message before it reaches the carrier. Verifiable in Console → Monitor → Logs → Messaging.');
-
-h3('Cancellation window');
-p('Cancellation is only available while status = scheduled. Twilio moves scheduled messages to queued approximately 15 minutes before sendAt. After that, cancellation returns error 30409 and the message is committed.');
-say('If the RFP evaluators ask about pulling back a message that has already been handed to Twilio: it is supported on Programmable Messaging with Status=canceled, up to about 15 minutes before send. For the recurring reminder flow, list-right-before-send on Bulk is the better fit — that\'s what the live demo shows.');
+p('Returns status=canceled. Only valid while message is in scheduled status; returns error 30409 otherwise.');
 
 doc.end();
 console.log('Wrote', OUT);
