@@ -108,9 +108,9 @@ p('This demo answers Continental Finance\'s SMS RFP by proving three of the four
 p('The fourth use case (business-user campaign administration) is addressed as a talk-track in this document — Twilio Console covers most of it honestly, and we concede the one gap explicitly.');
 
 h2('Three scenes, one browser, one cell phone');
-keyValue('Scene A', 'Send Surge past-due reminder — high-volume, personalized, scheduled.');
-keyValue('Scene B', 'Cancel a scheduled SMS via Update Message · Status=canceled.');
-keyValue('Scene C', 'Response & opt-out — Advanced Opt-Out + free-form capture + DNC.');
+keyValue('Use Case 1', 'Payment reminder + past-due messaging — high-volume, personalized, scheduled.');
+keyValue('Use Case 2', 'Cancel a scheduled SMS via Update Message · Status=canceled.');
+keyValue('Use Case 3', 'Response & opt-out — Advanced Opt-Out + free-form capture + DNC.');
 
 h2('What you\'ll ask them to notice');
 bullet('One API call, up to 10,000 recipients per request, per-recipient status tracking.');
@@ -141,17 +141,17 @@ step(5, 'Dashboard open',
   'Browser: http://localhost:3001 — you should see the Surge SMS Operations Center, three tabs (A, B, C), and the pulsing green "Live" pill in the header.');
 
 step(6, 'Cell in hand, signal confirmed',
-  'You\'ll text to the Surge long code from your cell during Scene C. Test with a single "test" text before the demo starts — it will show up in the Inbound stream and you\'ll know the round-trip works.');
+  'You\'ll text to the Surge long code from your cell during Use Case 3. Test with a single "test" text before the demo starts — it will show up in the Inbound stream and you\'ll know the round-trip works.');
 
 muted('Fallback: if ngrok flakes or Twilio 5xx during the demo, you have a screen-recorded backup take. Do not attempt to fix live — pivot to the recording and keep talking.');
 
 // ────────── SCENE A ──────────
 newPage();
-h1('Scene A · Payment Reminder');
+h1('Use Case 1 · Payment Reminder');
 muted('RFP use case 1: high-volume scheduled reminders. Target: 3 minutes.');
 
-h3('Open on Scene A tab');
-say('Continental sends 3.5 million past-due reminders a month today, from short codes, in an 8-to-9 window. Watch what one Twilio Bulk API call looks like.');
+h3('Open on Use Case 1 tab');
+say('Continental sends 3.5 million payment reminders a month today — both proactive statement-due nudges and past-due delinquency messaging — from short codes, in an 8-to-9 window. Watch what one Twilio Bulk API call looks like.');
 
 step(1, 'Click "Send now"',
   'The activity log below shows exactly what happens: dashboard hits our server, server calls Twilio Bulk API, Twilio returns 202 Accepted with an operationId. Counters advance. Your cell gets a real SMS in under 4 seconds.');
@@ -168,10 +168,10 @@ say('Same endpoint accepts Content Templates by SID for RCS cards, MMS, WhatsApp
 
 // ────────── SCENE B ──────────
 newPage();
-h1('Scene B · Cancel a scheduled SMS before it sends');
+h1('Use Case 2 · Cancel a scheduled SMS before it sends');
 muted('RFP use case 2: pull an SMS that\'s already scheduled if the cardholder pays before it fires. Target: 4 minutes.');
 
-h3('Open Scene B tab');
+h3('Open Use Case 2 tab');
 say('If Continental Finance schedules a reminder and the cardholder pays before it sends, they need to stop that SMS. Twilio\'s Programmable Messaging API supports that with one call. Watch three steps.');
 
 step(1, 'Click "Schedule Jane\'s reminder (20 min from now)"',
@@ -183,7 +183,7 @@ step(2, 'Click "Payment posted → cancel scheduled SMS"',
 say('That was one API call. Update Message with Status=canceled. The scheduled SMS will never be delivered — Twilio drops it before handing off to the carrier.');
 
 step(3, 'Verify in Twilio Console',
-  'Click the Console link on the right of Scene B (or navigate manually: Console → Monitor → Logs → Messaging → find that MessageSid). Status shows canceled. Refresh to confirm.');
+  'Click the Console link on the right of Use Case 2 (or navigate manually: Console → Monitor → Logs → Messaging → find that MessageSid). Status shows canceled. Refresh to confirm.');
 say('That is the audit record. Continental\'s compliance team, or Amplix during their review, can walk this trail for any message: scheduled at X, canceled at Y, never delivered. No cardholder ever saw the past-due reminder they had already paid.');
 
 h3('Honest note on the cancellation window');
@@ -193,10 +193,10 @@ say('This is documented behavior. If the evaluators ask what happens if payment 
 
 // ────────── SCENE C ──────────
 newPage();
-h1('Scene C · Response & Opt-Out');
+h1('Use Case 3 · Response & Opt-Out');
 muted('RFP use case 3: capture every inbound, handle STOP compliantly, review the rest, block on request. Target: 5 minutes. Two things happen here — the automated path (STOP/START/HELP handled entirely by Twilio) and the manual path (free-form text captured for a human).');
 
-h3('Open Scene C tab');
+h3('Open Use Case 3 tab');
 say('Every SMS platform has to handle inbound messages from customers. There are two flavors: the compliance-critical keywords like STOP, and everything else. Watch how Twilio handles each.');
 
 step(1, 'PART A — Text "STOP" from your cell to the Surge long code',
@@ -204,15 +204,15 @@ step(1, 'PART A — Text "STOP" from your cell to the Surge long code',
 say('That reply, that block-list entry, that audit record — all handled by Twilio\'s Advanced Opt-Out feature on the Messaging Service. You configured the reply copy once in Console. No downstream sync, no code, no risk of missing a STOP.');
 
 step(2, 'PART A — Prove the block by trying to send again',
-  'Click the Scene A tab. Click "Send now". The activity log will show Twilio accepted the request but the response will surface error 21610 — attempt to send to unsubscribed recipient — and the Delivered counter for your cell does not increment.');
+  'Click the Use Case 1 tab. Click "Send now". The activity log will show Twilio accepted the request but the response will surface error 21610 — attempt to send to unsubscribed recipient — and the Delivered counter for your cell does not increment.');
 say('Continental\'s STOP compliance is now enforced at the Twilio edge. Even a rogue downstream send is blocked before it leaves. That\'s a compliance posture your incumbent can\'t match without your engineers writing the enforcement themselves.');
 
 step(3, 'PART A — Text "START" to re-opt',
-  'Back on Scene C. Text START from your cell. Twilio auto-replies with the re-opt confirmation. Row appears: "Advanced Opt-Out · START". Number is removed from Twilio\'s block list. Future sends go through.');
+  'Back on Use Case 3. Text START from your cell. Twilio auto-replies with the re-opt confirmation. Row appears: "Advanced Opt-Out · START". Number is removed from Twilio\'s block list. Future sends go through.');
 say('Same automation for opt-in. Same audit trail. Same zero code.');
 
 newPage();
-h1('Scene C · continued');
+h1('Use Case 3 · continued');
 
 step(4, 'PART B — Text "please stop bugging me" from your cell',
   'This is NOT a keyword. Twilio doesn\'t classify it. Twilio delivers the raw text to our inbound webhook. An amber-bordered row appears in the Inbound Stream: "Free-form (needs human review)".');
@@ -224,7 +224,7 @@ say('That number is now on our app-side Do-Not-Contact list. This is a suppressi
 p('One: it works across every sender you ever add. If you buy a second Surge number tomorrow, the DNC still applies. That\'s the cross-sender governance the RFP explicitly asks for. Two: it lets a compliance officer intervene proactively — for example, adding a number after a support call, or a complaint routed through Genesys.');
 
 step(6, 'PART B — Prove the DNC block by trying to send again',
-  'Click the Scene A tab. Click "Send now". The response payload will show "blockedByDnc": [<your cell>]. The send never leaves our server — Twilio isn\'t even called for that number.');
+  'Click the Use Case 1 tab. Click "Send now". The response payload will show "blockedByDnc": [<your cell>]. The send never leaves our server — Twilio isn\'t even called for that number.');
 say('That\'s defense in depth. Twilio blocks at the edge for STOP. We block before the API call for our own DNC list. Cardholders don\'t receive messages they asked us to stop.');
 
 muted('Honest concession on re-opt: Twilio\'s Advanced Opt-Out block list is Console-managed. There is no public REST API to remove a number from that block list — the customer must text START. If Continental wants programmatic re-opt for support-desk workflows, that\'s a Support case or a manual Console action.');
