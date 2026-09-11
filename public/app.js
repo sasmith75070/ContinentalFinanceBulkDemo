@@ -155,7 +155,7 @@ async function fireCampaign({ scheduleFor, buttonId, scheduleLabel } = {}) {
     tech: `POST /api/campaigns/send${scheduleFor ? ' · scheduleFor=' + scheduleFor : ''}`,
     plain: scheduleFor
       ? `Server renders Jane's personalized body and calls Programmable Messaging with <code>scheduleType=fixed</code>, <code>sendAt</code> = <b>${scheduleLabel}</b>.`
-      : 'Server renders Jane\'s personalized body and calls Programmable Messaging with a <code>messageIntent</code> — every send passes through Compliance Toolkit for per-recipient Quiet Hours evaluation.',
+      : 'Server renders Jane\'s personalized body and calls Programmable Messaging for immediate send. <code>messageIntent: notifications</code> classifies this correctly for Compliance Toolkit\'s consent + risk pipeline.',
   });
   const started = performance.now();
   try {

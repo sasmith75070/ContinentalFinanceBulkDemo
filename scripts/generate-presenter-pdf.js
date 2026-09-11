@@ -108,18 +108,19 @@ p('This demo answers Continental Finance\'s SMS RFP by proving three of the four
 p('The fourth use case (business-user campaign administration) is addressed as a talk-track in this document — Twilio Console covers most of it honestly, and we concede the one gap explicitly.');
 
 h2('Three use cases, one browser, one cell phone');
-keyValue('Use Case 1', 'Payment reminder — fire-and-forget via Create Message + Compliance Toolkit Quiet Hours enforcement.');
+keyValue('Use Case 1', 'Payment reminder + past-due messaging — high-volume, personalized, scheduled per RFP.');
 keyValue('Use Case 2', 'Message pull-back — schedule + cancel via Update Message with Status=canceled.');
 keyValue('Use Case 3', 'Response & opt-out — Advanced Opt-Out + free-form capture + DNC.');
 
 h2('What you\'ll ask them to notice');
-bullet('Compliance Toolkit enforces TCPA + state Quiet Hours per recipient — Continental Finance stops doing timezone math in their scheduler.');
-bullet('messageIntent tags each send so essential (notifications, OTP, fraud) bypasses Quiet Hours and non-essential (marketing) is auto-rescheduled.');
 bullet('Per-message MessageSid — every send is individually addressable, cancellable, and auditable.');
+bullet('Native scheduling from 15 min to 7 days out via scheduleType=fixed + sendAt.');
+bullet('Per-cardholder timezone sendAt supports the RFP\'s 8am–9pm-local rule without segmentation gymnastics.');
 bullet('Cancel-in-flight via Update Message with Status=canceled while message is still scheduled.');
 bullet('STOP/START/HELP handled natively via Advanced Opt-Out — zero code.');
 bullet('Free-form inbound captured for human review — real cross-sender DNC.');
 bullet('At 3.5M/mo (~4/sec average), fan-out fits comfortably inside short-code throughput (100 MPS).');
+bullet('Compliance Toolkit enabled — consent + risk + known-litigators checks on every send (talk-track).');
 
 // ────────── SETUP ──────────
 newPage();
@@ -138,8 +139,8 @@ step(3, 'Messaging Service inbound webhook',
 step(4, 'Advanced Opt-Out configured',
   'Same service → Opt-Out Management → Advanced enabled. Custom Surge STOP copy set (see appendix for suggested wording). Keywords: STOP/START/HELP.');
 
-step('4b', 'Compliance Toolkit enabled',
-  'Console → Messaging → Services → your Surge service → Compliance Toolkit → Enabled. Quiet Hours handling = Reschedule (default). This is what makes Use Case 1\'s fire-and-forget pitch true; without CT enabled, messages fire immediately regardless of local time.');
+step('4b', 'Compliance Toolkit (optional)',
+  'Console → Messaging → Services → your Surge service → Compliance Toolkit. Enabled is fine; it will apply consent/risk/litigators checks on the path. Continental Finance\'s traffic is classified as notifications (essential), so CT Quiet Hours enforcement does not apply — timing stays in Continental Finance\'s scheduler. Not required for the demo to run.');
 
 step(5, 'Dashboard open',
   'Browser: http://localhost:3001 — you should see the Continental Finance SMS Operations header and three Use Case tabs (1, 2, 3).');
@@ -151,34 +152,24 @@ muted('Fallback: if ngrok flakes or Twilio 5xx during the demo, you have a scree
 
 // ────────── USE CASE 1 ──────────
 newPage();
-h1('Use Case 1 · Fire and Forget · Compliance Toolkit');
+h1('Use Case 1 · Payment Reminder');
 muted('RFP use case 1: high-volume payment reminder + past-due messaging. Target: 3 minutes.');
 
 h3('Open on Use Case 1 tab');
-say('Continental Finance sends three-point-five million payment reminders a month, from short codes, in a self-defined 8-to-9 window that they run in Eastern Time. That means cardholders in Pacific Time can receive messages at 5 AM local — a TCPA violation nobody meant to make. Watch what happens when Twilio\'s Compliance Toolkit is on the path.');
+say('Continental Finance sends 3.5 million payment reminders a month — both proactive upcoming-payment nudges and past-due delinquency messaging — from short codes, inside an 8-to-9 ET window. Watch what one Programmable Messaging call looks like.');
 
 step(1, 'Click "Send now"',
-  'Dashboard hits our server. Server calls client.messages.create() with the Messaging Service SID, the personalized body, and messageIntent="marketing" — no scheduleType, no sendAt. Continental Finance is not doing any timezone math on their side.');
-say('One API call, one MessageSid. The important thing is what happens next.');
+  'Dashboard hits our server. Server renders Jane\'s personalized body and calls client.messages.create() with the Messaging Service SID, the recipient, the body, and messageIntent="notifications". Twilio returns 201 Created + a MessageSid. The status card flips through queued → sending → sent → delivered as GET /Messages/{Sid} is polled every 750ms. Your cell buzzes with the real message.');
+say('One API call, one MessageSid. At Continental Finance\'s 3.5 million a month — about four per second average — this is a fan-out: one call per cardholder. A single short code handles 100 messages per second, so throughput is not the bottleneck. And every message has its own SID: fully cancellable, fully auditable, one row per cardholder in Console.');
 
-step(2, 'Compliance Toolkit evaluates Quiet Hours per recipient',
-  'Twilio takes the outbound message, infers the recipient\'s local timezone from area code — or from a ZIP code if Continental Finance provides it via Contact API — and checks against TCPA quiet hours (9 PM to 8 AM local) plus state-specific overlays for Alabama, Florida, Louisiana, Maryland, Mississippi, Oklahoma, Tennessee, Washington, Connecticut, Nevada, and Texas.');
-say('If the send is inside quiet hours for that cardholder, Twilio auto-reschedules the message for the next allowed window. Status returns as "scheduled" with a ScheduledAt timestamp. If it is outside quiet hours, delivered immediately. Continental Finance sees the outcome and does not have to compute any of it.');
+step(2, 'Click "Schedule for 10am tomorrow ET"',
+  'Same Programmable Messaging endpoint, this time with scheduleType=fixed and sendAt=<tomorrow 10:00 ET>. Twilio returns a MessageSid with status=scheduled. This message will hold on Twilio\'s schedule and fire at the sendAt time.');
+say('Programmable Messaging supports scheduling from fifteen minutes to seven days out. Continental Finance would compute per-cardholder sendAt in their scheduler based on each cardholder\'s timezone — that gives them the 8am-9pm-local rule the RFP requires, at the granularity the RFP requires it, without any segmentation gymnastics in their file. That work stays in their scheduler where it already lives; it just gets easier with per-message sendAt values instead of batched sends.');
 
-step(3, 'Status card shows what happened',
-  'For the demo — during business hours — you will most likely see queued → sending → sent → delivered because it is not quiet hours anywhere in the US. Point at the messageIntent field in the raw API panel and say: this is what tells CT how to classify the message.');
-say('The value here is what you don\'t see: Continental Finance\'s scheduler does not need to segment by timezone. It does not need to know that Sunday in Texas has different rules. Twilio enforces the federal TCPA baseline plus every state overlay Twilio supports, per recipient, on every message. Zero code.');
-
-h3('Compliance judgment call');
-p('Payment reminders sit on a line. Twilio\'s Compliance Toolkit treats OTP, fraud alerts, notifications, customer support, security alerts, and delivery updates as essential (bypass Quiet Hours). It treats marketing, events, education, polling, announcements as non-essential (Quiet Hours enforced).');
-p('Continental Finance\'s counsel decides which bucket a payment reminder falls into. Two defensible choices:');
-bullet('Classify as notifications (essential): CT delivers immediately regardless of time. Continental Finance retains responsibility for FDCPA 8am–9pm local windowing themselves.');
-bullet('Classify as marketing (non-essential): CT enforces TCPA + state Quiet Hours automatically. Continental Finance offloads that timing enforcement to Twilio.');
-p('The demo uses "marketing" so the CT evaluation is visibly on the path. For the RFP response we present both options and let their compliance team pick.');
-
-h3('If they push back on removing scheduling');
-p('The Message Scheduling capability is still there — scheduleType=fixed + sendAt on the same Create Message endpoint, minimum 15 min lead, maximum 7 days. Continental Finance can use it for coordinated blasts where they want an explicit send time (e.g., a statement-day 10am local across all cardholders). Not the primary pitch, but available.');
-say('If they specifically want to see it, we can trigger the same endpoint with a sendAt parameter — no code change on our side, just a different curl. But the CT path is the stronger story: less code on their side, better TCPA posture out of the box.');
+h3('Compliance Toolkit — talk-track');
+p('Compliance Toolkit is enabled on the Messaging Service, so every outbound message flows through it. What CT gives Continental Finance on the path: consent enforcement, risk-check evaluation, known-litigators screening, per-recipient TCPA metadata.');
+p('Because Continental Finance\'s traffic is entirely transactional — payment reminders + past-due, no marketing — the correct classification is messageIntent="notifications" (essential). Essential-category messages bypass CT Quiet Hours enforcement, so send-window timing stays where it belongs: in Continental Finance\'s scheduler, using per-cardholder sendAt.');
+say('If evaluators ask whether CT could handle the send window automatically: technically yes for non-essential traffic, but their program is not non-essential. We passed on the mislabel — it would be a bigger compliance problem than the one it solved.');
 
 
 // ────────── USE CASE 2 ──────────
