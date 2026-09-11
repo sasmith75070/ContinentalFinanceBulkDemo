@@ -18,19 +18,19 @@
 
   <nav class="scenes">
     <button class="scene-tab active" data-scene="a">
-      <span class="tab-num">A</span>
+      <span class="tab-num">1</span>
       <span class="tab-title">Payment Reminder</span>
-      <span class="tab-sub">RFP use case 1</span>
+      <span class="tab-sub">Bulk send &amp; schedule</span>
     </button>
     <button class="scene-tab" data-scene="b">
-      <span class="tab-num">B</span>
-      <span class="tab-title">Payment Suppression</span>
-      <span class="tab-sub">RFP use case 2</span>
+      <span class="tab-num">2</span>
+      <span class="tab-title">Cancel Scheduled SMS</span>
+      <span class="tab-sub">Update Message · Status=canceled</span>
     </button>
     <button class="scene-tab" data-scene="c">
-      <span class="tab-num">C</span>
+      <span class="tab-num">3</span>
       <span class="tab-title">Response &amp; Opt-Out</span>
-      <span class="tab-sub">RFP use case 3</span>
+      <span class="tab-sub">Advanced Opt-Out + DNC</span>
     </button>
   </nav>
 
@@ -39,10 +39,41 @@
     <section class="scene" data-scene="a">
       <div class="scene-head">
         <div>
-          <div class="eyebrow">Scene A</div>
+          <div class="eyebrow">Use Case 1</div>
           <h2>Send a past-due payment reminder</h2>
-          <p>One API call to Twilio Bulk Messaging. Personalized per recipient via Liquid variables. Delivery status streams back in real time.</p>
+          <p class="use-case-def">Continental Finance's core outbound program: deliver personalized past-due payment reminders to 3.5M cardholders per month with per-recipient delivery status, native scheduling, and rich-content fallback — from a single API call.</p>
         </div>
+      </div>
+
+      <div class="products-used">
+        <div class="eyebrow">Twilio Products used</div>
+        <ul class="product-list">
+          <li>
+            <div class="product-title"><b>Bulk Messaging API</b> · <code>POST /v1/Messages</code></div>
+            <div class="product-desc">One request accepts up to 10,000 recipients with per-recipient Liquid variables. Returns <code>operationId</code>.</div>
+            <a href="https://www.twilio.com/docs/bulk-messaging" target="_blank" rel="noreferrer">Docs ↗</a>
+          </li>
+          <li>
+            <div class="product-title"><b>Bulk Operations Resource</b> · <code>GET /v1/Messages/Operations/{id}</code></div>
+            <div class="product-desc">Poll per-recipient status: total / delivered / failed / unaddressable.</div>
+            <a href="https://www.twilio.com/docs/bulk-messaging" target="_blank" rel="noreferrer">Docs ↗</a>
+          </li>
+          <li>
+            <div class="product-title"><b>Message Scheduling</b> · <code>schedule.sendAt</code> (Bulk)</div>
+            <div class="product-desc">Up to 7 days out. Omit the timezone and Twilio auto-localizes to each cardholder's timezone.</div>
+            <a href="https://www.twilio.com/docs/bulk-messaging/scheduling" target="_blank" rel="noreferrer">Docs ↗</a>
+          </li>
+          <li>
+            <div class="product-title"><b>Rich Content</b> · <code>channels.priority</code> + Content Templates</div>
+            <div class="product-desc">RCS card or MMS via Content SID, with automatic SMS fallback for devices that can't render.</div>
+            <a href="https://www.twilio.com/docs/bulk-messaging/rich-content" target="_blank" rel="noreferrer">Docs ↗</a>
+          </li>
+          <li>
+            <div class="product-title"><b>Messaging Service</b></div>
+            <div class="product-desc">Sender pool that owns the long code, opt-out configuration, and delivery routing.</div>
+            <a href="https://www.twilio.com/docs/messaging/services" target="_blank" rel="noreferrer">Docs ↗</a>
+          </li>
+        </ul>
       </div>
 
       <div class="coach" data-scene-coach="a">
@@ -143,7 +174,7 @@
       <div class="activity-panel scene-activity">
         <div class="activity-header">
           <div>
-            <div class="eyebrow">Live activity · Scene A</div>
+            <div class="eyebrow">Live activity · Use Case 1</div>
             <h3>What just happened · API calls &amp; Twilio events</h3>
           </div>
           <div class="activity-legend">
@@ -163,10 +194,41 @@
     <section class="scene hidden" data-scene="b">
       <div class="scene-head">
         <div>
-          <div class="eyebrow">Scene B</div>
+          <div class="eyebrow">Use Case 2</div>
           <h2>Cancel a scheduled SMS before it sends</h2>
-          <p>If Continental Finance schedules a reminder and then the cardholder pays before it fires, they can cancel that SMS with one API call — as long as the message is still in <code>scheduled</code> status (up to about 15 minutes before the scheduled send time).</p>
+          <p class="use-case-def">When Continental Finance has already scheduled a reminder and the cardholder pays before it fires, pull that specific message with one API call — as long as it is still in <code>scheduled</code> status (up to about 15 minutes before the scheduled send time). No batch reprocessing, no stale reminders reaching paid-up cardholders.</p>
         </div>
+      </div>
+
+      <div class="products-used">
+        <div class="eyebrow">Twilio Products used</div>
+        <ul class="product-list">
+          <li>
+            <div class="product-title"><b>Programmable Messaging · Create Message</b> · <code>POST /2010-04-01/Accounts/{Sid}/Messages.json</code></div>
+            <div class="product-desc">Create the scheduled SMS with <code>scheduleType=fixed</code>, <code>sendAt</code>, and a Messaging Service SID. Returns a MessageSid + <code>status=scheduled</code>.</div>
+            <a href="https://www.twilio.com/docs/messaging/api/message-resource" target="_blank" rel="noreferrer">Docs ↗</a>
+          </li>
+          <li>
+            <div class="product-title"><b>Message Scheduling</b> · <code>scheduleType=fixed</code> + <code>sendAt</code></div>
+            <div class="product-desc">Requires a Messaging Service. Fires at the exact sendAt. Cancellable while still <code>scheduled</code>.</div>
+            <a href="https://www.twilio.com/docs/messaging/features/message-scheduling" target="_blank" rel="noreferrer">Docs ↗</a>
+          </li>
+          <li>
+            <div class="product-title"><b>Programmable Messaging · Update Message</b> · <code>POST /Messages/{Sid}.json</code> with <code>Status=canceled</code></div>
+            <div class="product-desc">Flips a scheduled message's status. Twilio drops the message before handing off to the carrier.</div>
+            <a href="https://www.twilio.com/docs/messaging/api/message-resource" target="_blank" rel="noreferrer">Docs ↗</a>
+          </li>
+          <li>
+            <div class="product-title"><b>Error 30409</b> — This message cannot be canceled</div>
+            <div class="product-desc">Returned when a message has left <code>scheduled</code> (moves to <code>queued</code> ~15 min before sendAt). Defines the cancellation window.</div>
+            <a href="https://www.twilio.com/docs/api/errors/30409" target="_blank" rel="noreferrer">Docs ↗</a>
+          </li>
+          <li>
+            <div class="product-title"><b>Messaging Service</b></div>
+            <div class="product-desc">Required for scheduled messages. Owns the sender pool the scheduled SMS will fire from.</div>
+            <a href="https://www.twilio.com/docs/messaging/services" target="_blank" rel="noreferrer">Docs ↗</a>
+          </li>
+        </ul>
       </div>
 
       <div class="coach" data-scene-coach="b">
@@ -243,7 +305,7 @@
       <div class="activity-panel scene-activity">
         <div class="activity-header">
           <div>
-            <div class="eyebrow">Live activity · Scene B</div>
+            <div class="eyebrow">Live activity · Use Case 2</div>
             <h3>What just happened · API calls &amp; Twilio events</h3>
           </div>
           <div class="activity-legend">
@@ -262,10 +324,36 @@
     <section class="scene hidden" data-scene="c">
       <div class="scene-head">
         <div>
-          <div class="eyebrow">Scene C</div>
+          <div class="eyebrow">Use Case 3</div>
           <h2>Every inbound message, captured and actionable</h2>
-          <p>STOP / START / HELP handled natively by Twilio's Advanced Opt-Out (Messaging Service, Console-configured). Everything else lands in an Ops Review Queue for human review.</p>
+          <p class="use-case-def">Capture every cardholder response, handle STOP/START/HELP compliantly via Twilio-native automation (no code), route free-form text to a human review queue, and enforce app-side Do-Not-Contact suppression across every sender Continental Finance owns.</p>
         </div>
+      </div>
+
+      <div class="products-used">
+        <div class="eyebrow">Twilio Products used</div>
+        <ul class="product-list">
+          <li>
+            <div class="product-title"><b>Advanced Opt-Out</b> · Messaging Service feature</div>
+            <div class="product-desc">Twilio auto-replies to STOP / START / HELP with custom Surge copy, updates the block list, and POSTs to your webhook with <code>OptOutType</code> for audit. Zero code.</div>
+            <a href="https://www.twilio.com/docs/messaging/tutorials/advanced-opt-out" target="_blank" rel="noreferrer">Docs ↗</a>
+          </li>
+          <li>
+            <div class="product-title"><b>Inbound Webhook</b> · <code>POST /webhooks/twilio/inbound</code></div>
+            <div class="product-desc">Every inbound SMS is delivered to your webhook — keyword-matched and free-form both. Free-form lands in the Ops Review Queue for a human.</div>
+            <a href="https://www.twilio.com/docs/messaging/tutorials/how-to-receive-and-reply" target="_blank" rel="noreferrer">Docs ↗</a>
+          </li>
+          <li>
+            <div class="product-title"><b>Error 21610</b> — Attempt to send to unsubscribed recipient</div>
+            <div class="product-desc">Returned when Continental Finance tries to send to a number on Twilio's opt-out block list. Enforced at Twilio's edge.</div>
+            <a href="https://www.twilio.com/docs/api/errors/21610" target="_blank" rel="noreferrer">Docs ↗</a>
+          </li>
+          <li>
+            <div class="product-title"><b>Messaging Service</b></div>
+            <div class="product-desc">Owns the Advanced Opt-Out configuration, sender pool, and inbound webhook URL. Console-managed.</div>
+            <a href="https://www.twilio.com/docs/messaging/services" target="_blank" rel="noreferrer">Docs ↗</a>
+          </li>
+        </ul>
       </div>
 
       <div class="coach" data-scene-coach="c">
@@ -321,7 +409,7 @@
       <div class="activity-panel scene-activity">
         <div class="activity-header">
           <div>
-            <div class="eyebrow">Live activity · Scene C</div>
+            <div class="eyebrow">Live activity · Use Case 3</div>
             <h3>What just happened · Inbound &amp; DNC events</h3>
           </div>
           <div class="activity-legend">

@@ -354,6 +354,71 @@ main { padding: 20px 28px 40px; }
   border: 1px solid var(--border);
 }
 
+/* ---------- Use case definition + Twilio products used ---------- */
+.use-case-def {
+  font-size: 14px;
+  color: var(--text);
+  max-width: 72ch;
+  margin: 6px 0 0 !important;
+  line-height: 1.6;
+}
+.products-used {
+  background: linear-gradient(180deg, rgba(216,27,61,0.05), rgba(255,255,255,0.02));
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--surge-red);
+  border-radius: 8px;
+  padding: 14px 18px;
+  margin-bottom: 18px;
+}
+.products-used .eyebrow { margin-bottom: 10px; display: block; }
+.product-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 8px;
+}
+.product-list li {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 12px 16px;
+  align-items: start;
+  padding: 10px 12px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+.product-list .product-title {
+  font-size: 13px;
+  color: var(--text);
+  grid-column: 1;
+}
+.product-list .product-title b { color: white; }
+.product-list .product-desc {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.5;
+  grid-column: 1;
+  margin-top: 3px;
+}
+.product-list a {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-self: center;
+  color: var(--surge-red-2);
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: none;
+  border: 1px solid rgba(244,63,94,0.35);
+  border-radius: 6px;
+  padding: 6px 10px;
+  white-space: nowrap;
+}
+.product-list a:hover {
+  background: rgba(244,63,94,0.08);
+  border-color: var(--surge-red-2);
+}
+
 /* ---------- Honest-note callout under coach ---------- */
 .flow-note {
   background: linear-gradient(180deg, rgba(240,178,58,0.10), rgba(240,178,58,0.03));
