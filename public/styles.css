@@ -236,6 +236,8 @@ main { padding: 20px 28px 40px; }
 .proof-list { margin: 0; padding-left: 18px; color: var(--text); font-size: 13px; line-height: 1.7; }
 .proof-list li { margin-bottom: 6px; }
 .proof-list b { color: #ffffff; }
+.proof-list li.dim { color: var(--muted); font-style: italic; }
+.proof-list li.dim b { color: var(--muted-2); font-weight: 600; }
 .proof-list.check { list-style: none; padding-left: 0; }
 .proof-list.check li { position: relative; padding-left: 22px; }
 .proof-list.check li::before {

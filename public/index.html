@@ -20,7 +20,7 @@
     <button class="scene-tab active" data-scene="a">
       <span class="tab-num">1</span>
       <span class="tab-title">Payment Reminder</span>
-      <span class="tab-sub">Create Message · immediate + scheduled</span>
+      <span class="tab-sub">Fire &amp; forget · Compliance Toolkit</span>
     </button>
     <button class="scene-tab" data-scene="b">
       <span class="tab-num">2</span>
@@ -40,8 +40,8 @@
       <div class="scene-head">
         <div>
           <div class="eyebrow">Use Case 1</div>
-          <h2>Send a payment reminder</h2>
-          <p class="use-case-def">Continental Finance's core outbound program — payment reminders and past-due messaging. Whether the reminder is proactive (statement due in N days) or reactive (payment past-due), the mechanic is the same: personalized SMS to 3.5M cardholders per month with per-recipient delivery status and native scheduling, from a single API call.</p>
+          <h2>Fire and forget · Compliance Toolkit handles the send window</h2>
+          <p class="use-case-def">Continental Finance sends 3.5M payment reminders a month. Instead of computing timezone-safe send windows in their scheduler, they enable Twilio's <b>Compliance Toolkit</b> — every message passes through per-recipient TCPA quiet-hours enforcement (plus state-specific overlays for AL/FL/LA/MD/MS/OK/TN/WA/CT/NV/TX). Continental Finance fires whenever; Twilio delivers within safe hours per cardholder, automatically.</p>
         </div>
       </div>
 
@@ -50,18 +50,18 @@
         <ul class="product-list">
           <li>
             <div class="product-title"><b>Programmable Messaging · Create Message</b> · <code>POST /2010-04-01/Accounts/{Sid}/Messages.json</code></div>
-            <div class="product-desc">Actively invoked by both buttons below. Server calls <code>client.messages.create()</code> with the Messaging Service SID, the recipient's number, and the personalized body. Returns a <code>MessageSid</code> and an initial <code>status</code>.</div>
+            <div class="product-desc">Actively invoked by the Send button. Server calls <code>client.messages.create()</code> with the Messaging Service SID, the recipient's number, the personalized body, and <code>messageIntent</code>. Returns a <code>MessageSid</code> and an initial <code>status</code>.</div>
             <a href="https://www.twilio.com/docs/messaging/api/message-resource" target="_blank" rel="noreferrer">Docs ↗</a>
+          </li>
+          <li>
+            <div class="product-title"><b>Compliance Toolkit</b> · Console-enabled · per-recipient Quiet Hours enforcement</div>
+            <div class="product-desc">Twilio evaluates every outbound US SMS against the recipient's local TCPA quiet hours (9pm–8am) plus stricter state windows. Non-essential messages sent inside quiet hours are <b>auto-rescheduled</b> for later delivery (status becomes <code>scheduled</code> with a <code>ScheduledAt</code>). Essential messages tagged via <code>messageIntent</code> — <code>otp</code>, <code>notifications</code>, <code>fraud</code>, <code>security</code>, <code>customercare</code>, <code>delivery</code> — bypass Quiet Hours entirely.</div>
+            <a href="https://www.twilio.com/docs/messaging/features/compliance-toolkit" target="_blank" rel="noreferrer">Docs ↗</a>
           </li>
           <li>
             <div class="product-title"><b>Fetch Message</b> · <code>GET /Messages/{Sid}.json</code></div>
-            <div class="product-desc">Polled every 750ms after each send to update the status card as the message transitions <code>queued</code> → <code>sending</code> → <code>sent</code> → <code>delivered</code>.</div>
+            <div class="product-desc">Polled every 750ms to update the status card. If CT rescheduled the message, status shows <code>scheduled</code> plus a <code>ScheduledAt</code>; otherwise <code>queued</code> → <code>sending</code> → <code>sent</code> → <code>delivered</code>.</div>
             <a href="https://www.twilio.com/docs/messaging/api/message-resource" target="_blank" rel="noreferrer">Docs ↗</a>
-          </li>
-          <li>
-            <div class="product-title"><b>Message Scheduling</b> · <code>scheduleType=fixed</code> + <code>sendAt</code></div>
-            <div class="product-desc">Actively invoked by the Schedule button. Requires a Messaging Service. Minimum 15 min lead, maximum 7 days out.</div>
-            <a href="https://www.twilio.com/docs/messaging/features/message-scheduling" target="_blank" rel="noreferrer">Docs ↗</a>
           </li>
           <li>
             <div class="product-title"><b>Messaging Service</b></div>
@@ -69,30 +69,31 @@
             <a href="https://www.twilio.com/docs/messaging/services" target="_blank" rel="noreferrer">Docs ↗</a>
           </li>
         </ul>
+        <div class="products-note">Continental Finance's <b>compliance counsel</b> chooses how to classify payment reminders (essential <code>notifications</code> vs non-essential <code>marketing</code>). The demo passes <code>marketing</code> so Quiet Hours enforcement is visible on the path. Contact API (optional) allows ZIP-based location for higher accuracy than area-code inference.</div>
       </div>
 
       <div class="coach" data-scene-coach="a">
         <div class="coach-step" data-step="1">
           <div class="coach-num">1</div>
           <div class="coach-text">
-            <b>Click "Send now" or "Schedule"</b>
-            <span>Browser calls our server at <code>POST /api/campaigns/send</code>. Server renders the personalized body and calls Programmable Messaging.</span>
+            <b>Click "Send now"</b>
+            <span>Server calls Programmable Messaging with the recipient's number, the personalized body, and <code>messageIntent</code> — no <code>scheduleType</code>, no <code>sendAt</code>. Continental Finance is not doing any timezone math.</span>
           </div>
         </div>
         <div class="coach-arrow">→</div>
         <div class="coach-step" data-step="2">
           <div class="coach-num">2</div>
           <div class="coach-text">
-            <b>Twilio returns a MessageSid</b>
-            <span>Twilio's <code>POST /Messages.json</code> returns a MessageSid and an initial status (<code>accepted</code> or <code>scheduled</code>). Dashboard polls <code>GET /Messages/{Sid}.json</code> every 750ms.</span>
+            <b>Compliance Toolkit evaluates Quiet Hours per recipient</b>
+            <span>Twilio infers the recipient's timezone from area code (or ZIP via Contact API). If the current time is inside TCPA quiet hours for that cardholder, CT auto-reschedules for the next allowed window. If outside, delivers immediately.</span>
           </div>
         </div>
         <div class="coach-arrow">→</div>
         <div class="coach-step" data-step="3">
           <div class="coach-num">3</div>
           <div class="coach-text">
-            <b>Status transitions live</b>
-            <span>Status card flips: <code>queued</code> → <code>sending</code> → <code>sent</code> → <code>delivered</code>. Real message on Jane's cell. Chat thread mirrors what she sees.</span>
+            <b>Status card shows what happened</b>
+            <span>Immediate path: <code>queued</code> → <code>sending</code> → <code>sent</code> → <code>delivered</code>. CT-rescheduled path: <code>scheduled</code> with a <code>ScheduledAt</code> timestamp visible in the response. Either way, no code on Continental Finance's side.</span>
           </div>
         </div>
       </div>
@@ -101,11 +102,7 @@
         <div class="btn-row">
           <button id="send-btn" class="btn primary large">
             <span class="btn-label">Send now</span>
-            <span class="btn-endpoint">POST <code>/2010-04-01/…/Messages.json</code> · immediate</span>
-          </button>
-          <button id="schedule-btn" class="btn ghost large">
-            <span class="btn-label">Schedule for 10am tomorrow ET</span>
-            <span class="btn-endpoint">POST <code>/…/Messages.json</code> · <code>scheduleType=fixed</code></span>
+            <span class="btn-endpoint">POST <code>/2010-04-01/…/Messages.json</code> · <code>messageIntent</code> passes CT evaluation</span>
           </button>
         </div>
       </div>
@@ -152,10 +149,12 @@
         <div class="sub-panel">
           <h3>What this proves</h3>
           <ul class="proof-list">
-            <li><b>One API call, one MessageSid.</b> <code>POST /Messages.json</code> creates a single message. At Continental Finance's 3.5M/mo (~4/sec average, higher at peak) this becomes a fan-out — one call per cardholder — well within a short code's 100 MPS throughput.</li>
+            <li><b>No timezone math in Continental Finance's scheduler.</b> Fire whenever. CT infers each recipient's local zone from area code (or ZIP if provided) and enforces TCPA 9pm–8am plus state-specific overlays automatically.</li>
+            <li><b>Auto-reschedule out of Quiet Hours.</b> Non-essential message sent inside quiet hours → CT reschedules for the next allowed window. Status flips to <code>scheduled</code> with a <code>ScheduledAt</code>. Continental Finance sees the outcome via GET /Messages/{Sid} or status callbacks.</li>
+            <li><b>Essential messages bypass Quiet Hours.</b> Tag with <code>messageIntent: 'notifications'</code> (or <code>otp</code>, <code>fraud</code>, <code>customercare</code>, <code>delivery</code>, <code>security</code>) and CT lets them through immediately. Continental Finance's counsel decides what classifies as essential for their program.</li>
+            <li><b>Per-message MessageSid.</b> Every send is individually addressable, auditable, and (as Use Case 2 shows) cancellable via Update Message.</li>
             <li><b>Personalization is server-rendered.</b> Continental Finance's application builds the <code>body</code> per cardholder before the API call. Full flexibility, no template language limits.</li>
-            <li><b>Per-message status.</b> <code>GET /Messages/{Sid}.json</code> returns the current lifecycle state. Status callbacks also stream every transition to the inbound webhook for BI and audit.</li>
-            <li><b>Native scheduling.</b> <code>scheduleType=fixed</code> + <code>sendAt</code>, between 15 minutes and 7 days out. Continental Finance computes per-cardholder timezone at schedule time.</li>
+            <li class="dim"><b>Scheduling still available if needed.</b> If Continental Finance wants explicit control over a specific send time — say, a coordinated statement blast at 10am local — <code>scheduleType=fixed</code> + <code>sendAt</code> is available on the same endpoint. Talk-track only in this demo; not the primary pitch.</li>
           </ul>
         </div>
       </div>

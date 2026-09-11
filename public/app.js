@@ -155,7 +155,7 @@ async function fireCampaign({ scheduleFor, buttonId, scheduleLabel } = {}) {
     tech: `POST /api/campaigns/send${scheduleFor ? ' · scheduleFor=' + scheduleFor : ''}`,
     plain: scheduleFor
       ? `Server renders Jane's personalized body and calls Programmable Messaging with <code>scheduleType=fixed</code>, <code>sendAt</code> = <b>${scheduleLabel}</b>.`
-      : 'Server renders Jane\'s personalized body and calls Programmable Messaging for immediate send.',
+      : 'Server renders Jane\'s personalized body and calls Programmable Messaging with a <code>messageIntent</code> — every send passes through Compliance Toolkit for per-recipient Quiet Hours evaluation.',
   });
   const started = performance.now();
   try {
@@ -216,11 +216,17 @@ async function fireCampaign({ scheduleFor, buttonId, scheduleLabel } = {}) {
 }
 
 $('send-btn').addEventListener('click', () => fireCampaign({ buttonId: 'send-btn' }));
-$('schedule-btn').addEventListener('click', () => fireCampaign({
-  scheduleFor: 'tomorrow-10am-et',
-  scheduleLabel: '10:00 tomorrow ET',
-  buttonId: 'schedule-btn',
-}));
+// Schedule button was removed from UC1 (CT is the primary pitch). The backend
+// still accepts `scheduleFor` — reachable via curl or a future button — so
+// the capability isn't lost, just not the demo's first move.
+const scheduleBtn = $('schedule-btn');
+if (scheduleBtn) {
+  scheduleBtn.addEventListener('click', () => fireCampaign({
+    scheduleFor: 'tomorrow-10am-et',
+    scheduleLabel: '10:00 tomorrow ET',
+    buttonId: 'schedule-btn',
+  }));
+}
 
 // ────────── Scene B — schedule + cancel (message pull-back) ──────────
 const queueTableBody = document.querySelector('#queue-table tbody');
