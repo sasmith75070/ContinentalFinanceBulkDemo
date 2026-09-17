@@ -297,7 +297,7 @@ $('queue-reset').addEventListener('click', async () => {
     scene: 'b',
     kind: 'server', tag: 'Server',
     tech: 'POST /api/queue/reset',
-    plain: 'Rebuilding today\'s Surge Mastercard reminder queue — no Twilio call.',
+    plain: 'Rebuilding today\'s reminder queue — no Twilio call.',
   });
   const res = await fetch('/api/queue/reset', { method: 'POST' });
   const data = await res.json();
@@ -418,7 +418,7 @@ const dncListEl = $('dnc-list');
 function renderInbound(rows) {
   inboundListEl.innerHTML = '';
   if (rows.length === 0) {
-    inboundListEl.innerHTML = '<div class="sub" style="padding: 8px 4px;">No inbound messages yet. Text the Surge long code from your cell.</div>';
+    inboundListEl.innerHTML = '<div class="sub" style="padding: 8px 4px;">No inbound messages yet. Text the Continental Finance SMS line from your cell.</div>';
     return;
   }
   for (const r of rows) {
@@ -555,7 +555,7 @@ es.onmessage = (e) => {
             scene: 'c',
             kind: 'twilio-in', tag: 'Twilio Inbound',
             tech: `POST /webhooks/twilio/inbound · OptOutType=${evt.optOutType}`,
-            plain: `Twilio's <b>Advanced Opt-Out</b> matched <code>${evt.optOutType}</code>. Twilio already sent the custom Surge confirmation reply and added the number to its block list. Our webhook received the event with an <code>OptOutType</code> header for audit.`,
+            plain: `Twilio's <b>Advanced Opt-Out</b> matched <code>${evt.optOutType}</code>. Twilio already sent the custom STOP confirmation reply and added the number to its block list. Our webhook received the event with an <code>OptOutType</code> header for audit.`,
             doc: { url: 'https://www.twilio.com/docs/messaging/tutorials/advanced-opt-out', label: 'Docs · Advanced Opt-Out' },
           });
           advanceCoach('c', 2);

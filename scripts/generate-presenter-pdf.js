@@ -17,7 +17,7 @@ const doc = new PDFDocument({
   size: 'LETTER',
   margins: { top: 60, bottom: 60, left: 60, right: 60 },
   info: {
-    Title: 'Continental Finance · Surge Mastercard SMS Demo · Presenter Guide',
+    Title: 'Continental Finance · SMS API Explainer · Presenter Guide',
     Author: 'Twilio Solutions Engineering',
     Subject: 'Presenter guide for the Twilio Bulk Messaging demo',
   },
@@ -83,18 +83,16 @@ doc.rect(0, 0, 612, 792).fill(NAVY);
 doc.fillColor('white').font('Helvetica-Bold').fontSize(11)
   .text('TWILIO · SOLUTIONS ENGINEERING', 60, 90, { characterSpacing: 2 });
 
-doc.rect(60, 220, 200, 60).fill(SURGE_RED);
-doc.fillColor('white').font('Helvetica-Bold').fontSize(30)
-  .text('SURGE', 76, 232);
-doc.fillColor('#f6c9cf').font('Helvetica').fontSize(9)
-  .text('MASTERCARD®', 76, 265, { characterSpacing: 2 });
-
 doc.fillColor('white').font('Helvetica-Bold').fontSize(34)
-  .text('Continental Finance', 60, 340);
-doc.fillColor(SURGE_RED).font('Helvetica-Bold').fontSize(20)
-  .text('Twilio Bulk Messaging Demo', 60, 385);
+  .text('Continental Finance', 60, 260);
+doc.fillColor(SURGE_RED).font('Helvetica-Bold').fontSize(22)
+  .text('SMS API Explainer', 60, 305);
+doc.fillColor('white').font('Helvetica-Bold').fontSize(22)
+  .text('Example Code Execution', 60, 335);
 doc.fillColor('#8ea0bd').font('Helvetica').fontSize(14)
-  .text('Presenter Guide · Step-by-step run of book', 60, 415);
+  .text('Presenter Guide · Step-by-step run of book', 60, 380);
+doc.fillColor('#8ea0bd').font('Helvetica-Oblique').fontSize(11)
+  .text('Sample application demonstrating Twilio Programmable Messaging.\nNot a Twilio product interface.', 60, 410, { lineGap: 2 });
 
 doc.fillColor('#8ea0bd').font('Helvetica').fontSize(10)
   .text('Prepared for: Amplix + Continental Finance RFP evaluation', 60, 700)
@@ -134,19 +132,19 @@ step(2, 'ngrok tunnel up',
   'Terminal 2: ngrok http 3001 --url sasmith.ngrok.app\nBrowser test: https://sasmith.ngrok.app/api/queue should return JSON (may 307 through ngrok abuse page — fine, Twilio\'s webhook UA bypasses it).');
 
 step(3, 'Messaging Service inbound webhook',
-  'Console → Messaging → Services → your Surge service → Integration → Inbound Webhook URL = https://sasmith.ngrok.app/webhooks/twilio/inbound. Method: POST.');
+  'Console → Messaging → Services → your Messaging Service → Integration → Inbound Webhook URL = https://sasmith.ngrok.app/webhooks/twilio/inbound. Method: POST.');
 
 step(4, 'Advanced Opt-Out configured',
-  'Same service → Opt-Out Management → Advanced enabled. Custom Surge STOP copy set (see appendix for suggested wording). Keywords: STOP/START/HELP.');
+  'Same service → Opt-Out Management → Advanced enabled. Custom STOP copy set (see appendix for suggested wording). Keywords: STOP/START/HELP.');
 
 step('4b', 'Compliance Toolkit (optional)',
-  'Console → Messaging → Services → your Surge service → Compliance Toolkit. Enabled is fine; it will apply consent/risk/litigators checks on the path. Continental Finance\'s traffic is classified as notifications (essential), so CT Quiet Hours enforcement does not apply — timing stays in Continental Finance\'s scheduler. Not required for the demo to run.');
+  'Console → Messaging → Services → your Messaging Service → Compliance Toolkit. Enabled is fine; it will apply consent/risk/litigators checks on the path. Continental Finance\'s traffic is classified as notifications (essential), so CT Quiet Hours enforcement does not apply — timing stays in Continental Finance\'s scheduler. Not required for the demo to run.');
 
 step(5, 'Dashboard open',
   'Browser: http://localhost:3001 — you should see the Continental Finance SMS Operations header and three Use Case tabs (1, 2, 3).');
 
 step(6, 'Cell in hand, signal confirmed',
-  'You\'ll text to the Surge long code from your cell during Use Case 3. Test with a single "test" text before the demo starts — it will show up in the Inbound stream and you\'ll know the round-trip works.');
+  'You\'ll text to the Continental Finance SMS line from your cell during Use Case 3. Test with a single "test" text before the demo starts — it will show up in the Inbound stream and you\'ll know the round-trip works.');
 
 muted('Fallback: if ngrok flakes or Twilio 5xx during the demo, you have a screen-recorded backup take. Do not attempt to fix live — pivot to the recording and keep talking.');
 
@@ -205,8 +203,8 @@ muted('RFP use case 3: capture every inbound, handle STOP compliantly, review th
 h3('Open Use Case 3 tab');
 say('Every SMS platform has to handle inbound messages from customers. There are two flavors: the compliance-critical keywords like STOP, and everything else. Watch how Twilio handles each.');
 
-step(1, 'PART A — Text "STOP" from your cell to the Surge long code',
-  'Within 1–2 seconds:\n• Twilio auto-replies with your custom Surge confirmation copy — no code on your side.\n• A red-bordered row appears in the Inbound Stream: "Advanced Opt-Out · STOP".\n• The activity log narrates the OptOutType=STOP event with a link to the Twilio doc.\n• Twilio adds your cell to its block list.');
+step(1, 'PART A — Text "STOP" from your cell to the Continental Finance SMS line',
+  'Within 1–2 seconds:\n• Twilio auto-replies with your custom STOP confirmation copy — no code on your side.\n• A red-bordered row appears in the Inbound Stream: "Advanced Opt-Out · STOP".\n• The activity log narrates the OptOutType=STOP event with a link to the Twilio doc.\n• Twilio adds your cell to its block list.');
 say('That reply, that block-list entry, that audit record — all handled by Twilio\'s Advanced Opt-Out feature on the Messaging Service. You configured the reply copy once in Console. No downstream sync, no code, no risk of missing a STOP.');
 
 step(2, 'PART A — Prove the block by trying to send again',
@@ -227,7 +225,7 @@ say('Every SMS platform has this problem: cardholders don\'t always say STOP. Th
 step(5, 'PART B — Click "Add to DNC" on that row',
   'The row moves. The Do-Not-Contact panel on the right lists that number. Timeline in the activity log stamps the addition.');
 say('That number is now on our app-side Do-Not-Contact list. This is a suppression layer that Continental controls — separate from Twilio\'s Advanced Opt-Out block list. Two important reasons.');
-p('One: it works across every sender you ever add. If you buy a second Surge number tomorrow, the DNC still applies. That\'s the cross-sender governance the RFP explicitly asks for. Two: it lets a compliance officer intervene proactively — for example, adding a number after a support call, or a complaint routed through Genesys.');
+p('One: it works across every sender you ever add. If Continental Finance provisions a second sender tomorrow, the DNC still applies. That\'s the cross-sender governance the RFP explicitly asks for. Two: it lets a compliance officer intervene proactively — for example, adding a number after a support call, or a complaint routed through Genesys.');
 
 step(6, 'PART B — Prove the DNC block by trying to send again',
   'Click the Use Case 1 tab. Click "Send now". The response payload will show "blockedByDnc": [<your cell>]. The send never leaves our server — Twilio isn\'t even called for that number.');
@@ -242,7 +240,7 @@ muted('No live UI. This is the section you present with slides on the projector 
 
 h2('Business users self-serve for');
 bullet('DNC / suppression list management via Messaging > Advanced Opt-Out (Console).');
-bullet('Opt-out confirmation wording — the custom Surge copy is editable in Console without a code deploy.');
+bullet('Opt-out confirmation wording — the custom STOP/START/HELP copy is editable in Console without a code deploy.');
 bullet('Sender Pool / Messaging Service configuration — add or remove numbers, change routing rules.');
 bullet('Scheduling adjustments and pausing campaigns — Programmable Messaging scheduling window from 15 min to 7 days out.');
 bullet('Delivery monitoring, alerts, reports — Console + Insights + Event Streams for BI destinations.');

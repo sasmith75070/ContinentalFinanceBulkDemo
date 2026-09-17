@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Continental Finance · Surge Mastercard SMS</title>
+  <title>Continental Finance · SMS API Explainer</title>
   <link rel="stylesheet" href="/styles.css" />
 </head>
 <body>
@@ -322,7 +322,7 @@
         <ul class="product-list">
           <li>
             <div class="product-title"><b>Advanced Opt-Out</b> · Messaging Service feature</div>
-            <div class="product-desc">Actively demonstrated. Twilio auto-replies to STOP / START / HELP with custom Surge copy, updates its block list, and POSTs the event to our webhook with an <code>OptOutType</code> header for audit. No code.</div>
+            <div class="product-desc">Actively demonstrated. Twilio auto-replies to STOP / START / HELP with the custom STOP/START/HELP copy Continental Finance configures in Console, updates its block list, and POSTs the event to our webhook with an <code>OptOutType</code> header for audit. No code.</div>
             <a href="https://www.twilio.com/docs/messaging/tutorials/advanced-opt-out" target="_blank" rel="noreferrer">Docs ↗</a>
           </li>
           <li>
@@ -343,7 +343,7 @@
           <div class="coach-num">1</div>
           <div class="coach-text">
             <b>Text <code>STOP</code> from your cell</b>
-            <span>Advanced Opt-Out matches the keyword. Twilio replies with the custom Surge confirmation, adds the number to the block list, and POSTs to our webhook with <code>OptOutType=STOP</code>.</span>
+            <span>Advanced Opt-Out matches the keyword. Twilio replies with the custom STOP confirmation copy, adds the number to the block list, and POSTs to our webhook with <code>OptOutType=STOP</code>.</span>
           </div>
         </div>
         <div class="coach-arrow">→</div>
@@ -369,7 +369,7 @@
         <div class="prompt-number">
           <a href="sms:+18776197994">+1 (877) 619-7994</a>
         </div>
-        <div class="prompt-example"><code>STOP</code> <span class="prompt-arrow">→</span> Advanced Opt-Out (custom Surge reply)</div>
+        <div class="prompt-example"><code>STOP</code> <span class="prompt-arrow">→</span> Advanced Opt-Out (custom STOP confirmation reply)</div>
         <div class="prompt-example"><code>please stop bugging me</code> <span class="prompt-arrow">→</span> Ops Review Queue</div>
         <div class="prompt-example"><code>START</code> <span class="prompt-arrow">→</span> re-opts (Advanced Opt-Out block list removes number)</div>
         <div class="prompt-note">STOP only blocks outbound to your cell. Inbound from your cell still works — you can send STOP, free-form, and START in any order without getting stuck.</div>
