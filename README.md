@@ -227,8 +227,8 @@ The DNC list is intentionally separate from Twilio's Advanced Opt-Out block list
 │   └── styles.css
 ├── scripts/
 │   ├── generate-presenter-pdf.js   # regenerate slides/demo-presenter-guide.pdf
-│   ├── smoke.js                    # single-SMS smoke test (verify auth end-to-end)
-│   └── list-senders.js             # utility: list Messaging Service senders
+│   ├── list-senders.js             # utility: list Messaging Service senders
+│   └── smoke.js                    # single-SMS smoke test (verify auth end-to-end)
 ├── slides/
 │   └── demo-presenter-guide.pdf    # regenerated with `npm run pdf`
 └── data/                           # SQLite DB (gitignored); auto-created on first run
