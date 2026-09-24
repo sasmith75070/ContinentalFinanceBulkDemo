@@ -594,3 +594,22 @@ es.onmessage = (e) => {
 loadQueue();
 loadInbound();
 loadDnc();
+
+// Populate the UC3 prompt card's SMS number from server config, so the
+// deployment's own sender phone shows up instead of a hardcoded value.
+function formatE164(e164) {
+  if (!e164) return '';
+  const m = /^\+1(\d{3})(\d{3})(\d{4})$/.exec(e164);
+  return m ? `+1 (${m[1]}) ${m[2]}-${m[3]}` : e164;
+}
+fetch('/api/config').then((r) => r.json()).then((cfg) => {
+  const el = document.getElementById('sms-line');
+  if (!el) return;
+  if (cfg.smsLine) {
+    el.textContent = formatE164(cfg.smsLine);
+    el.href = 'sms:' + cfg.smsLine;
+  } else {
+    el.textContent = '— set TWILIO_FROM_LONGCODE in .env —';
+    el.removeAttribute('href');
+  }
+}).catch(() => { /* leave the loading placeholder */ });

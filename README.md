@@ -22,15 +22,39 @@ Three of the four RFP core use cases, live end-to-end:
 
 ## Prerequisites
 
-Before running:
+Set these up before running the demo. Total time: 15–20 minutes if you don't already have a Twilio account.
 
-- **Node.js 20+** installed locally
-- **A Twilio account** with:
-  - API Key + Secret (or Account SID + Auth Token) — see the [Twilio Console API keys page](https://console.twilio.com/us1/account/keys-credentials/api-keys)
-  - A **Messaging Service** with a phone number in its sender pool (long code, toll-free, or short code)
-  - **Advanced Opt-Out** enabled on the Messaging Service, with custom STOP/START/HELP copy configured (required for Use Case 3)
-  - Optionally: **Compliance Toolkit** enabled (adds consent/risk/known-litigators checks on every send; not required for the demo to run)
-- **`ngrok`** installed (or another HTTPS tunnel) — required so Twilio can reach the local webhook endpoint for Use Case 3
+### 1. Local machine
+
+- **Node.js 20 or newer** — download from [nodejs.org](https://nodejs.org/) or install with your package manager
+- **Git** — to clone the repository
+- **A code editor** — VS Code, Sublime, or anything that can edit a `.env` file
+- **`ngrok`** — install from [ngrok.com/download](https://ngrok.com/download). Free tier is sufficient. Any HTTPS tunneling tool (Cloudflare Tunnel, localtunnel, etc.) works — ngrok is just the one referenced in this doc.
+
+### 2. Twilio account
+
+You need a Twilio account (trial or paid). Sign up at [twilio.com/try-twilio](https://www.twilio.com/try-twilio).
+
+**A. Get your credentials.** In the Twilio Console, go to [API Keys & Tokens](https://console.twilio.com/us1/account/keys-credentials/api-keys) and note or create:
+  - Your **Account SID** (`AC…`) — visible on the Console home page
+  - Your **Auth Token** — Console home page
+  - An **API Key** (`SK…`) + **API Secret** — click "Create API Key," name it, save the secret immediately (it's shown only once)
+
+**B. Get a phone number.** In the Console, go to [Phone Numbers → Buy a number](https://console.twilio.com/us1/develop/phone-numbers/manage/search). A US long code is easiest for a demo. Toll-free and short codes work but require additional carrier registration.
+
+**C. Create a Messaging Service.** In the Console, go to [Messaging → Services](https://console.twilio.com/us1/develop/sms/services) → **Create Messaging Service**:
+  - Give it a name (e.g. "Continental Finance Demo")
+  - Under **Sender Pool**, add the phone number from step B
+  - Save the **Messaging Service SID** (`MG…`) — you'll need it for `.env`
+
+**D. Enable Advanced Opt-Out on the Messaging Service.** In the same service, go to **Opt-Out Management** → toggle **Advanced** on. Configure the STOP/START/HELP reply copy. The presenter guide (`slides/demo-presenter-guide.pdf`) includes suggested wording in the appendix. **Required for Use Case 3.**
+
+**E. (Optional) Enable Compliance Toolkit.** Same service, **Compliance Toolkit** section, toggle on. Not required for the demo to run, but adds consent/risk/known-litigators checks and is referenced in the Use Case 1 talk-track.
+
+### 3. Cell phone
+
+- You'll need a real cell phone in E.164 format for the demo — this is the "customer" number that receives every outbound SMS in Use Case 1 and Use Case 2, and the number you'll text FROM during Use Case 3.
+- If Twilio's Geographic Permissions are enabled in your account, make sure the country the cell is in is allowed for SMS. Trial accounts also require the recipient number to be verified in Twilio's Console under [Verified Caller IDs](https://console.twilio.com/us1/develop/phone-numbers/manage/verified).
 
 ---
 

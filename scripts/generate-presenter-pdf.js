@@ -129,10 +129,10 @@ step(1, 'Server up on :3001',
   'Terminal 1: cd ~/Documents/ContinentalFinanceBulkDemo && node server.js\nWatch for: "Continental Finance Bulk Messaging Demo running on http://localhost:3001". No missing env-var warnings.');
 
 step(2, 'ngrok tunnel up',
-  'Terminal 2: ngrok http 3001 --url sasmith.ngrok.app\nBrowser test: https://sasmith.ngrok.app/api/queue should return JSON (may 307 through ngrok abuse page — fine, Twilio\'s webhook UA bypasses it).');
+  'Terminal 2: ngrok http 3001\nCopy the https:// forwarding URL that ngrok prints. Browser test: <your-ngrok-url>/api/queue should return JSON (may 307 through ngrok\'s abuse-check page — fine, Twilio\'s webhook UA bypasses it). Save the URL as PUBLIC_BASE_URL in .env and restart the server.');
 
 step(3, 'Messaging Service inbound webhook',
-  'Console → Messaging → Services → your Messaging Service → Integration → Inbound Webhook URL = https://sasmith.ngrok.app/webhooks/twilio/inbound. Method: POST.');
+  'Console → Messaging → Services → your Messaging Service → Integration → Inbound Webhook URL = <your-ngrok-url>/webhooks/twilio/inbound. Method: POST.');
 
 step(4, 'Advanced Opt-Out configured',
   'Same service → Opt-Out Management → Advanced enabled. Custom STOP copy set (see appendix for suggested wording). Keywords: STOP/START/HELP.');

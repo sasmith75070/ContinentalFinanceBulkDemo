@@ -13,6 +13,13 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false })); // Twilio webhooks are form-encoded
 app.use(express.static(path.join(__dirname, 'public')));
+// Client-safe subset of the server config. Exposes only the sender phone
+// so the UC3 prompt card can display whatever number is in this deployment's
+// .env, without hardcoding the demo author's number in the source.
+app.get('/api/config', (req, res) => {
+  res.json({ smsLine: process.env.TWILIO_FROM_LONGCODE || null });
+});
+
 app.use(streamRouter);
 app.use(sendRouter);
 app.use(inboundRouter);
