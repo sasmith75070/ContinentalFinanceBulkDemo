@@ -1,219 +1,93 @@
-# Continental Finance SMS Operations Demo
+# Continental Finance · SMS API Explainer
 
-A live, doc-defensible demonstration of Twilio's response to the Continental Finance SMS Campaign Requirements RFP (August 31, 2026). Runs entirely on Twilio Programmable Messaging. Every button in the dashboard fires a real Twilio API call against your account — nothing is mocked.
+**A sample application demonstrating how Twilio Programmable Messaging can be integrated into Continental Finance's own systems.** Not a Twilio product interface. Every button in the dashboard fires a real Twilio API call — nothing is mocked or pre-recorded.
 
-**Repository:** `sasmith75070/ContinentalFinanceBulkDemo` (repo name kept for continuity; the internal architecture pivoted from Bulk Messaging to Programmable Messaging on 2026-09-11).
-
----
-
-## What it demonstrates
-
-Three of the four RFP core use cases, live. The fourth (business-user administration) is addressed as a talk-track in the presenter guide, with an honest concession about the one gap.
-
-| Tab | RFP use case | Mechanic |
-| --- | --- | --- |
-| **1 · Payment Reminder** | Payment Reminder & Past-Due Messaging | Programmable Messaging **Create Message**, immediate + scheduled (`scheduleType=fixed` + `sendAt`) |
-| **2 · Message Pull-back** | Payment-Triggered Message Suppression | Programmable Messaging **Create Message** (scheduled) + payment webhook + **Update Message** with `Status=canceled` |
-| **3 · Response & Opt-Out** | Customer Response & Opt-Out Management | **Advanced Opt-Out** (Console-configured) + inbound webhook + app-side DNC list |
-
-**RFP use case 4** (Message & Campaign Administration) is not a live tab. It is covered in `slides/demo-presenter-guide.pdf` as a talk-track with an explicit concession: SMS body copy still requires an application code change; Twilio does not ship a business-user editor for SMS bodies.
+Prepared for the Continental Finance SMS Campaign Requirements RFP (August 31, 2026) and the Amplix-led evaluation.
 
 ---
 
-## Quick start
+## What this demo answers
 
-Prerequisites: Node 20+, a Twilio account with a Messaging Service, a phone number (long code, toll-free, or short code) attached to that service, and Advanced Opt-Out configured on the service.
+Three of the four RFP core use cases, live end-to-end. Each is a real Twilio API call against a real Twilio account, sending real SMS to a real phone.
 
-```bash
-git clone git@github.com:sasmith75070/ContinentalFinanceBulkDemo.git
-cd ContinentalFinanceBulkDemo
-npm install
-cp .env.example .env
-# edit .env — fill in every value (see Configuration below)
-node server.js
-# in a second terminal, optional:
-ngrok http 3001
-# open the dashboard
-open http://localhost:3001
-```
+### Use Case 1 · Payment Reminder & Past-Due Messaging
+
+Continental Finance sends **3.5 million payment reminders per month**, both proactive (upcoming payment due) and reactive (past-due delinquency). This tab shows the mechanic behind every one of those messages:
+
+- **Send now** — a single Programmable Messaging API call. Twilio returns a MessageSid; the dashboard tracks the message through its full lifecycle (`queued → sending → sent → delivered`) with sub-second latency.
+- **Schedule for 10am tomorrow ET** — the same API call with a `sendAt` value. Twilio holds the message and fires it at the scheduled time. Any per-cardholder timezone rule Continental Finance's scheduler applies produces the right per-message `sendAt`.
+
+Every message has its own MessageSid, so every message is individually addressable, cancellable, and auditable.
+
+### Use Case 2 · Payment-Triggered Message Suppression
+
+Continental Finance's current lag from payment posting to reminder suppression is ~15 minutes. This tab demonstrates how Twilio's Update Message API closes that gap for messages already scheduled:
+
+- **Schedule Jane's reminder (20 min out)** — a real Twilio scheduled send. Jane's row in the queue now has a MessageSid with status `scheduled`.
+- **Payment posted → cancel scheduled SMS** — simulates Continental Finance's payment system firing a webhook. The server looks up Jane's MessageSid and calls Twilio's Update Message API with `Status=canceled`. Twilio drops the message before it reaches the carrier. Jane never gets a past-due reminder for a bill she already paid.
+- **Verify in Twilio Console** — deep-link into Twilio's own Message Logs, where the status shows `canceled`. Full audit trail.
+
+**Honest note on the cancellation window:** cancellation only works while the message is in `scheduled` status. Twilio moves scheduled messages into `queued` roughly 15 minutes before their fire time. After that, cancellation is no longer available. Continental Finance's schedule lead time should be designed with this window in mind.
+
+### Use Case 3 · Customer Response & Opt-Out Management
+
+Every inbound SMS from a cardholder is captured — keyword-matched or free-form. Two paths, both live:
+
+- **STOP / START / HELP** — handled automatically by Twilio's Advanced Opt-Out feature. Continental Finance configures the reply copy once in the Twilio Console; Twilio sends the reply, updates its block list, and delivers an audit event to the application webhook. Zero code in Continental Finance's app.
+- **Free-form inbound** (e.g., "please stop bugging me", "I paid this last week", "wrong number") — Twilio delivers the raw message to the application webhook. The dashboard surfaces it in an **Ops Review Queue** where a human decides what to do. One click adds the number to the **Do-Not-Contact list**, which is app-side and enforced across every sender Continental Finance ever adds — the cross-sender governance the RFP explicitly asks for.
+
+### Use Case 4 · Message & Campaign Administration
+
+Not a live tab. Addressed in the presenter guide as a talk-track with a specific concession: **SMS body copy still requires an application code change.** Twilio does not ship a business-user editor for SMS bodies. For everything else in RFP use case 4 — DNC management, opt-out wording, sender-pool configuration, scheduling, monitoring, alerts, reporting — the Twilio Console covers business-user self-service.
 
 ---
 
-## Configuration
+## What you're looking at
 
-Every value in `.env` is required. Copy `.env.example` and fill in:
+The dashboard is a **sample application** built specifically for this evaluation. It illustrates how Continental Finance would integrate Twilio Programmable Messaging into their own systems — the buttons trigger the same API calls their production platform would make.
 
-| Variable | Purpose |
+Twilio does not ship this UI. Continental Finance would build their own admin surface on top of the same APIs. The value being demonstrated is the underlying Twilio capability — the Create Message endpoint, the Update Message endpoint with `Status=canceled`, the Advanced Opt-Out automation on the Messaging Service, the audit trail in the Twilio Console.
+
+---
+
+## Twilio capabilities demonstrated
+
+| Capability | Where in the demo |
 | --- | --- |
-| `TWILIO_ACCOUNT_SID` | Account SID (starts with `AC`). |
-| `TWILIO_API_KEY_SID` | API Key SID (starts with `SK`). Used for all authenticated calls. |
-| `TWILIO_API_KEY_SECRET` | API Key secret. |
-| `TWILIO_AUTH_TOKEN` | Account Auth Token — required for validating inbound webhook signatures. |
-| `TWILIO_FROM_LONGCODE` | Sender phone number in E.164. Must be attached to the Messaging Service below. |
-| `TWILIO_MESSAGING_SERVICE_SID` | Messaging Service SID (`MG…`). Required — every Create Message call references it, and it is required for message scheduling and cancellation. |
-| `CUSTOMER_PHONE` | The presenter's cell in E.164. This is the demo's "Jane." Every outbound SMS goes here; every inbound in Use Case 3 originates here. |
-| `SAFE_MODE` | `true` to refuse outbound sends to `CUSTOMER_PHONE`. Used during rehearsal so the presenter's cell is not spammed. |
-| `PUBLIC_BASE_URL` | The public URL Twilio can reach for inbound webhooks. Typically an ngrok tunnel. |
-| `PORT` | Server port. Defaults to `3001`. |
-| `MESSAGE_INTENT` | *(optional)* Overrides the demo's default `messageIntent` classification. Defaults to `notifications` — the correct classification for Continental Finance's transactional traffic. |
-
----
-
-## Twilio Console prerequisites
-
-Before the demo runs correctly, the following must be configured in the Twilio Console:
-
-1. **Messaging Service** — `TWILIO_MESSAGING_SERVICE_SID` must reference a service in the same account. `TWILIO_FROM_LONGCODE` must be in that service's sender pool.
-2. **Inbound Webhook URL** — set on the Messaging Service to `<PUBLIC_BASE_URL>/webhooks/twilio/inbound` (POST). Required for Use Case 3.
-3. **Advanced Opt-Out** — enabled on the Messaging Service. Custom Surge STOP/START/HELP copy configured (see the appendix in the presenter guide for suggested wording). Required for Use Case 3's automatic STOP path.
-4. **Compliance Toolkit** *(optional)* — enabled if you want consent/risk/known-litigators checks on every send. Not required for the demo to run; addressed as a talk-track in Use Case 1.
-
----
-
-## Architecture
-
-- **Node 20 + Express** — single-process server, no build step.
-- **Server-Sent Events (SSE)** — the dashboard subscribes to `/events` and receives every server-originated event (queue updates, inbound messages, DNC changes) in real time.
-- **SQLite (`better-sqlite3`)** — file-backed at `data/demo.db`. Holds the pending queue, DNC list, inbound message log, and campaign history. Deleted and reseeded on each server start's `seedQueue()` call.
-- **Twilio Node SDK v5** — every API call goes through `client().messages.create()`, `client().messages(sid).update()`, or `client().messages(sid).fetch()`.
-- **No Bulk Messaging.** `comms.twilio.com/v1/Messages` is not called anywhere. `lib/bulk.js` and `routes/operations.js` are deleted.
-
-### Twilio APIs used
-
-| API | Where |
-| --- | --- |
-| `POST /2010-04-01/Accounts/{Sid}/Messages.json` (Create Message) | Use Case 1 send + schedule (`routes/send.js`), Use Case 2 schedule (`routes/queue.js`) |
-| `POST /2010-04-01/Accounts/{Sid}/Messages/{Sid}.json` with `Status=canceled` (Update Message) | Use Case 2 cancel (`routes/queue.js`) |
-| `GET /2010-04-01/Accounts/{Sid}/Messages/{Sid}.json` (Fetch Message) | Use Case 1 status polling (`routes/send.js`, `/api/messages/:sid`) |
-| Advanced Opt-Out on the Messaging Service | Configured in Console; Use Case 3 receives `OptOutType` headers on the inbound webhook |
-| Messaging Service | Referenced on every send; owns the sender pool + Advanced Opt-Out config |
-
-### Continental Finance's own integration (not Twilio products)
-
-Called out honestly in the demo:
-
-- The `/webhooks/payment` endpoint — Continental Finance's payment system fires it. Would come from Fiserv → DBA-managed process in production per the RFP.
-- The pending queue — Continental Finance's data layer, holding the cardholders scheduled for today's reminder.
-- The app-side DNC list — cross-sender suppression governance the RFP explicitly asks for. Separate from Twilio's Advanced Opt-Out block list.
-
----
-
-## Use case details
-
-### Use Case 1 · Payment Reminder
-
-Two buttons in the dashboard:
-
-- **Send now** → `client.messages.create({ messagingServiceSid, to, body, messageIntent: 'notifications' })`. Twilio returns a MessageSid with an initial status. The status card polls `GET /Messages/{Sid}.json` every 750 ms until the message reaches a terminal state (`delivered` / `failed` / `undelivered` / `canceled`).
-- **Schedule for 10am tomorrow ET** → same call, plus `scheduleType: 'fixed'` and `sendAt`. Twilio returns status `scheduled`. Fires at the sendAt time.
-
-Personalization is server-rendered (no Liquid). Continental Finance's application builds the body per cardholder before the API call. See `routes/send.js` → `renderBody()`.
-
-**Compliance Toolkit** is enabled on the Messaging Service, so every send passes through it — for consent + risk + known-litigators checks. Because `messageIntent` is `notifications` (essential, given Continental Finance's transactional-only traffic), CT does not enforce Quiet Hours. Send-window timing remains Continental Finance's scheduler's responsibility, which is what the Schedule button demonstrates.
-
-### Use Case 2 · Message Pull-back
-
-Three buttons:
-
-- **Reset queue** — rebuilds the pending queue from `lib/recipients.js` fixture.
-- **Schedule Jane's reminder (20 min from now)** → `client.messages.create({ ..., scheduleType: 'fixed', sendAt: <+20min> })`. Twilio returns a MessageSid with status `scheduled`. Stored on Jane's queue row. Twilio Console deep-link appears in the timeline column.
-- **Payment posted → cancel scheduled SMS** → fires `POST /webhooks/payment` (Continental Finance's own webhook shape). Server looks up Jane's stored MessageSid, then calls `client.messages(sid).update({ status: 'canceled' })`. Twilio flips the status. Queue row shows `Canceled`.
-
-**Cancellation window:** cancellation only works while status is `scheduled`. Twilio moves scheduled messages to `queued` roughly 15 minutes before `sendAt`, at which point Update Message returns error `30409`. Design Continental Finance's schedule lead time so a cancel window is always available before send.
-
-### Use Case 3 · Response & Opt-Out
-
-No buttons for the outbound side — the presenter texts the Continental Finance SMS line from their cell.
-
-- **STOP / START / HELP** — handled entirely by Twilio's Advanced Opt-Out on the Messaging Service. Twilio auto-replies with the configured Surge copy, updates the block list, and POSTs the event to `/webhooks/twilio/inbound` with an `OptOutType` header. The dashboard renders a red-bordered row in the Inbound Stream.
-- **Free-form text** (anything non-keyword) — no auto-reply; Twilio posts the raw text to the same webhook. Dashboard renders an amber-bordered row. Presenter clicks **Add to DNC**, which adds the number to the app-side DNC list. Every subsequent Bulk / PM send checks this list before the API call.
-
-The DNC list is intentionally separate from Twilio's Advanced Opt-Out block list. The RFP asks for cross-sender governance ("how a customer appearing in multiple campaigns/brands should be handled when they opt out") — that is what the app-side DNC delivers.
-
----
-
-## Repository layout
-
-```
-.
-├── .env.example           # required environment variables, all documented
-├── .gitignore
-├── package.json
-├── server.js              # Express entrypoint; mounts every route
-├── lib/
-│   ├── recipients.js      # queue fixture: Jane (real) + 6 fictional peers on 555-01xx
-│   ├── state.js           # SQLite handle + schema
-│   └── twilio.js          # Twilio SDK client factory
-├── routes/
-│   ├── dnc.js             # app-side DNC + inbound message reads (UC3)
-│   ├── inbound.js         # POST /webhooks/twilio/inbound (UC3)
-│   ├── queue.js           # queue reset + schedule + cancel webhook (UC2)
-│   ├── send.js            # /api/campaigns/send + /api/messages/:sid (UC1)
-│   ├── status.js          # POST /webhooks/twilio/status (Twilio status callbacks)
-│   └── stream.js          # GET /events (SSE)
-├── public/
-│   ├── index.html         # single-page dashboard, three Use Case tabs
-│   ├── app.js             # SSE client, per-scene activity logs, all UI wiring
-│   └── styles.css         # Surge palette, coach strips, activity log rows
-├── scripts/
-│   ├── generate-presenter-pdf.js   # regenerate slides/demo-presenter-guide.pdf
-│   ├── smoke.js                    # single-SMS smoke test (verify auth end-to-end)
-│   ├── list-senders.js             # utility: list Messaging Service senders
-│   ├── bulk-scale-test.js          # RETIRED (Bulk-era); do not run
-│   └── verify-bulk-endpoint.js     # RETIRED (Bulk-era); do not run
-├── slides/
-│   └── demo-presenter-guide.pdf    # regenerated with `npm run pdf`
-└── data/                  # SQLite DB (gitignored); auto-created on first run
-```
-
----
-
-## npm scripts
-
-```bash
-npm start          # node server.js
-npm run dev        # node --watch server.js
-npm run smoke      # single-SMS end-to-end sanity check
-npm run pdf        # regenerate slides/demo-presenter-guide.pdf
-```
-
----
-
-## Running the demo
-
-The full run-book with what to click and what to say is in **`slides/demo-presenter-guide.pdf`**. Regenerate the PDF anytime with `npm run pdf`.
-
-The presenter guide covers:
-
-- Pre-flight checklist (server, ngrok, webhook URL, Advanced Opt-Out, dashboard, cell)
-- Scene-by-scene walkthrough with what to click, what to say (italic), and what to point at
-- Six-step Use Case 3 sequence split into Advanced Opt-Out (STOP/START/HELP) and free-form (Ops Review + DNC)
-- Admin talk-track for RFP use case 4
-- Honest concessions summary
-- Appendix with suggested Advanced Opt-Out copy and sample PM API payloads
+| **Programmable Messaging · Create Message** | Use Case 1 send + schedule, Use Case 2 schedule |
+| **Message Scheduling** (`scheduleType=fixed` + `sendAt`) | Use Case 1 schedule button, Use Case 2 primary flow |
+| **Programmable Messaging · Update Message** (`Status=canceled`) | Use Case 2 cancel button |
+| **Fetch Message** (live status polling) | Use Case 1 status card |
+| **Advanced Opt-Out** on the Messaging Service | Use Case 3 STOP / START / HELP path |
+| **Inbound Webhook** | Use Case 3 free-form capture |
+| **Messaging Service** | Sender pool + Advanced Opt-Out configuration |
+| **Compliance Toolkit** *(on the path, talk-track)* | Consent + risk + known-litigators checks on every send |
+| **Twilio Console — Message Logs** | Use Case 2 verification link |
 
 ---
 
 ## Honest concessions
 
-Explicitly documented in the demo and the presenter guide:
+Called out explicitly in the demo and the presenter guide — no product misrepresentation:
 
 1. **No business-user SMS body editor.** Twilio does not ship one. Body copy edits are a code change, or a services engagement to build a content editor on top of Programmable Messaging.
-2. **No programmatic re-opt from Twilio's Advanced Opt-Out block list.** The block list is Console-managed; the customer must text `START`, or Support intervenes.
-3. **Compliance Toolkit does not enforce Quiet Hours for this program.** `messageIntent: 'notifications'` (essential) is the honest classification for transactional traffic — and essential-category messages bypass CT Quiet Hours. Send-window timing stays in Continental Finance's scheduler.
-4. **Genesys is out of scope.** Continental Finance's contact center is entirely Genesys; Twilio is competing for SMS only. Agent visibility integrations would be a services engagement.
+2. **No programmatic re-opt from Twilio's Advanced Opt-Out block list.** Once a cardholder texts STOP, that entry is Console-managed; the cardholder must text START to re-subscribe, or Support intervenes.
+3. **Compliance Toolkit does not enforce Quiet Hours for this program.** Continental Finance's traffic is transactional (`messageIntent: 'notifications'`, essential), and essential messages bypass CT Quiet Hours by design. Send-window timing stays in Continental Finance's scheduler.
+4. **Genesys is out of scope.** Continental Finance's contact center runs entirely on Genesys. Twilio is competing for SMS only. Agent visibility integrations would be a services engagement.
 
 ---
 
-## Known limitations
+## Presenter guide
 
-- `scripts/bulk-scale-test.js` and `scripts/verify-bulk-endpoint.js` are Bulk-era leftovers. They will not work against the current backend. Safe to delete.
-- The plan file at `~/.claude/plans/continental-finance-bulk-demo.md` reflects the pre-pivot Bulk architecture and is stale.
-- Repo name still starts with "Bulk" — intentional. The internal architecture is Programmable Messaging.
+The step-by-step run-book — what to click, what to say, what to point at — lives in `slides/demo-presenter-guide.pdf`.
+
+Presenter, specialist, and developer notes (setup, `.env` reference, Console prerequisites, architecture, between-demo cleanup, npm scripts) are in [`PRESENTER-NOTES.md`](PRESENTER-NOTES.md).
 
 ---
 
-## References
+## Doc references
+
+Every Twilio API surface used in this demo is publicly documented:
 
 - [Programmable Messaging · Create Message](https://www.twilio.com/docs/messaging/api/message-resource)
 - [Message Scheduling](https://www.twilio.com/docs/messaging/features/message-scheduling)
